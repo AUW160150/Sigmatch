@@ -1,0 +1,15 @@
+{
+  "cohortName": "noah_bladder_study",
+  "patients_file_path": "config_files/pipeline_json_files/noah_bladder_study.json",
+  "pdf_data_dir": "documents/pdfs/noah_bladder_study",
+  "ocr_data_dir": "documents/ocr/noah_bladder_study",
+  "llm_summarization_result_dir": "results_dir/llm_summarization/noah_bladder_study",
+  "matching_result_dir": "results_dir/matching/noah_bladder_study",
+  "trial_file_config_path": "config_files/trial_files/pcv_trial.json",
+  "pdf_info_path": "config_files/other_config_files/Circulate_pdf_data_pull.csv",
+  "signatera_df_path": "config_files/other_config_files/All_Bladder_Cancer_Signatera.csv",
+  "signatera_filter_patients": "config_files/other_config_files/bladder_signatera_positive_with_6m.txt",
+  "llm_argument_json": "config_files/",
+  "extracted_features_path": "results_dir/llm_summarization/noah_bladder_study/patient_feature_summaries_noah_bladder_study.csv",
+  "evaluation_results_path": "results_dir/evaluation/matching_results_summary_noah_bladder_study.xlsx"
+}

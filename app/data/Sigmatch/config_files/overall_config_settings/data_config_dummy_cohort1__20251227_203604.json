@@ -1,0 +1,15 @@
+{
+  "cohortName": "dummy_cohort1",
+  "patients_file_path": "config_files/pipeline_json_files/dummy_cohort1.json",
+  "pdf_data_dir": "documents/pdfs/dummy_cohort1",
+  "ocr_data_dir": "documents/ocr/dummy_cohort1",
+  "llm_summarization_result_dir": "results_dir/llm_summarization/dummy_cohort1",
+  "matching_result_dir": "results_dir/matching/dummy_cohort1",
+  "trial_file_config_path": "config_files/trial_files/pcv_trial.json",
+  "pdf_info_path": "config_files/other_config_files/Circulate_pdf_data_pull.csv",
+  "signatera_df_path": "config_files/other_config_files/All_Bladder_Cancer_Signatera.csv",
+  "signatera_filter_patients": "config_files/other_config_files/bladder_signatera_positive_with_6m.txt",
+  "llm_argument_json": "config_files/",
+  "extracted_features_path": "results_dir/llm_summarization/dummy_cohort1/patient_feature_summaries_dummy_cohort1.csv",
+  "evaluation_results_path": "results_dir/evaluation/matching_results_summary_dummy_cohort1.xlsx"
+}
