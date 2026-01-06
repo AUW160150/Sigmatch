@@ -8,7 +8,7 @@ FILE STRUCTURE (Noah's SageMaker):
 ├── documents/
 ├── results_dir/
 ├── orchestrate_pipeline.py             ← Pipeline script
-└── streamlit_front_end_(rodela)/       ← This app folder
+└── streamlit_frontend/                 ← This app folder
     └── app.py                          ← YOU ARE HERE
 """
 
@@ -655,7 +655,7 @@ def page_setup_paths():
 │       └── {{cohort_name}}/
 │           └── matching_results.csv
 │
-└── streamlit_front_end_(rodela)/
+└── streamlit_frontend/
     └── app.py                   ← This app (YOU ARE HERE)
     """)
     

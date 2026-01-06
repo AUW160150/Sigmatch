@@ -11,18 +11,18 @@ cd /user-default-efs/sigmatch
 
 ### 2. Clone this repo as the streamlit folder:
 ```bash
-git clone https://github.com/AUW160150/Sigmatch.git streamlit_front_end_(rodela)
+git clone https://github.com/AUW160150/Sigmatch.git streamlit_frontend
 ```
 
 Or if you already have it, pull the latest:
 ```bash
-cd streamlit_front_end_(rodela)
+cd streamlit_frontend
 git pull origin main
 ```
 
 ### 3. Setup Python environment:
 ```bash
-cd streamlit_front_end_(rodela)
+cd streamlit_frontend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -65,7 +65,7 @@ The app expects to be placed in a subfolder of your main sigmatch directory:
 │   ├── llm_summarization/
 │   └── evaluation/
 │
-└── streamlit_front_end_(rodela)/       ← This app folder
+└── streamlit_frontend/                 ← This app folder
     ├── app.py                          ← Main Streamlit app
     ├── requirements.txt
     ├── README.md
