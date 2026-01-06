@@ -1,9 +1,0 @@
-{
-  "cohortName": "default_cohort",
-  "patients_file_path": "config_files/pipeline_json_files/dummy_cohort2.json",
-  "pdf_data_dir": "documents/pdfs/default_cohort",
-  "ocr_data_dir": "documents/ocr/default_cohort",
-  "llm_summarization_result_dir": "results_dir/llm_summarization/default_cohort",
-  "matching_result_dir": "results_dir/matching/default_cohort",
-  "extracted_features_path": "results_dir/llm_summarization/default_cohort/patient_feature_summaries_default_cohort.csv"
-}

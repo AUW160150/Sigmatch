@@ -29,11 +29,11 @@ import os
 # PATH CONFIGURATION
 # =============================================================================
 
-# Streamlit app is in: /sigmatch/streamlit_front_end_(rodela)/
+# Streamlit app is in: /sigmatch/streamlit_frontend/app.py
 # Data files are in:   /sigmatch/
 # So we go ONE LEVEL UP from the app's directory
 
-BASE_DIR = Path(__file__).parent.parent  # Goes up to /sigmatch/
+BASE_DIR = Path(__file__).resolve().parent.parent  # Goes up to /sigmatch/
 
 # Config files
 CONFIG_DIR = BASE_DIR / "config_files"

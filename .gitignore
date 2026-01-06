@@ -1,3 +1,8 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -16,60 +21,27 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
-# Virtual Environment
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-sigma/
-
-# Environment variables
+# Environment files
 .env
 .env.local
-.env.*.local
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
 
 # Logs
 *.log
-logs/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Snapshots (versioned config backups)
-snapshots/
-
-# Temporary files
-*.tmp
-*.bak
-*.swp
-.cache/
-
-# OS
-Thumbs.db
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Project specific
-*.pyc
-*.pyo
 
