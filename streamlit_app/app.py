@@ -1,6 +1,15 @@
 """
 Sigmatch Streamlit App - Clinical Trial Matching Interface
 Replicates the Lovable React frontend functionality
+
+FILE STRUCTURE (Noah's SageMaker):
+/sigmatch/                              ← Parent directory (BASE_DIR)
+├── config_files/
+├── documents/
+├── results_dir/
+├── orchestrate_pipeline.py             ← Pipeline script
+└── streamlit_front_end_(rodela)/       ← This app folder
+    └── app.py                          ← YOU ARE HERE
 """
 
 import streamlit as st
@@ -17,7 +26,41 @@ import sys
 import os
 
 # =============================================================================
-# CONFIGURATION
+# PATH CONFIGURATION
+# =============================================================================
+
+# Streamlit app is in: /sigmatch/streamlit_front_end_(rodela)/
+# Data files are in:   /sigmatch/
+# So we go ONE LEVEL UP from the app's directory
+
+BASE_DIR = Path(__file__).parent.parent  # Goes up to /sigmatch/
+
+# Config files
+CONFIG_DIR = BASE_DIR / "config_files"
+OVERALL_CONFIG = CONFIG_DIR / "overall_config_settings" / "active_data_config.json"
+PROMPT_SETTINGS = CONFIG_DIR / "prompt_settings" / "sigmatch_standard_prompt_content.json"
+TRIAL_FILES_DIR = CONFIG_DIR / "trial_files"
+COHORT_FILES_DIR = CONFIG_DIR / "pipeline_json_files"
+
+# Documents
+DOCUMENTS_DIR = BASE_DIR / "documents"
+OCR_DIR = DOCUMENTS_DIR / "ocr"
+PDF_DIR = DOCUMENTS_DIR / "pdfs"
+
+# Results
+RESULTS_DIR = BASE_DIR / "results_dir"
+MATCHING_DIR = RESULTS_DIR / "matching"
+LLM_SUMMARIZATION_DIR = RESULTS_DIR / "llm_summarization"
+EVALUATION_DIR = RESULTS_DIR / "evaluation"
+
+# Pipeline script (at root level, same as BASE_DIR)
+PIPELINE_SCRIPT = BASE_DIR / "orchestrate_pipeline.py"
+
+# Snapshots
+SNAPSHOTS_DIR = BASE_DIR / "snapshots"
+
+# =============================================================================
+# STREAMLIT CONFIGURATION
 # =============================================================================
 
 st.set_page_config(
@@ -26,9 +69,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Base directory for all data files
-BASE_DIR = Path(__file__).parent.parent / "app" / "data" / "Sigmatch"
 
 # =============================================================================
 # CUSTOM CSS STYLING
@@ -203,21 +243,34 @@ st.markdown("""
 # UTILITY FUNCTIONS
 # =============================================================================
 
-def load_json(filepath: str) -> Dict[str, Any]:
-    """Load a JSON file from the data directory."""
+def get_paths_info() -> Dict[str, str]:
+    """Return all important paths for display."""
+    return {
+        "base_dir": str(BASE_DIR.resolve()),
+        "pipeline_script": str(PIPELINE_SCRIPT.resolve()),
+        "config_dir": str(CONFIG_DIR.resolve()),
+        "trials_dir": str(TRIAL_FILES_DIR.resolve()),
+        "cohorts_dir": str(COHORT_FILES_DIR.resolve()),
+        "results_dir": str(RESULTS_DIR.resolve()),
+        "active_config": str(OVERALL_CONFIG.resolve()),
+    }
+
+def load_json(relative_path: str) -> Optional[Dict[str, Any]]:
+    """Load JSON file from path relative to BASE_DIR."""
     try:
-        full_path = BASE_DIR / filepath
+        full_path = BASE_DIR / relative_path
+        if not full_path.exists():
+            return None
         with open(full_path, 'r') as f:
             return json.load(f)
-    except FileNotFoundError:
-        return {}
-    except json.JSONDecodeError:
-        return {}
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading {relative_path}: {e}")
+        return None
 
-def save_json(filepath: str, data: Dict[str, Any]) -> bool:
-    """Save data to a JSON file in the data directory."""
+def save_json(relative_path: str, data: Dict[str, Any]) -> bool:
+    """Save JSON file to path relative to BASE_DIR."""
     try:
-        full_path = BASE_DIR / filepath
+        full_path = BASE_DIR / relative_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         with open(full_path, 'w') as f:
             json.dump(data, f, indent=2)
@@ -227,72 +280,97 @@ def save_json(filepath: str, data: Dict[str, Any]) -> bool:
         return False
 
 def get_trials() -> List[Dict[str, str]]:
-    """Get list of available trials from config_files/trial_files/."""
-    trials_dir = BASE_DIR / "config_files" / "trial_files"
+    """Get all trial files from trial_files directory."""
+    if not TRIAL_FILES_DIR.exists():
+        return []
+    
     trials = []
-    if trials_dir.exists():
-        for f in trials_dir.glob("*.json"):
-            try:
-                data = load_json(f"config_files/trial_files/{f.name}")
-                trials.append({
-                    "filename": f.name,
-                    "title": data.get("title", f.stem),
-                    "_id": data.get("_id", f.stem)
-                })
-            except:
-                trials.append({
-                    "filename": f.name,
-                    "title": f.stem,
-                    "_id": f.stem
-                })
+    for f in TRIAL_FILES_DIR.glob("*.json"):
+        try:
+            with open(f, 'r') as file:
+                data = json.load(file)
+            trials.append({
+                "filename": f.name,
+                "title": data.get("title", f.stem),
+                "_id": data.get("_id", f.stem)
+            })
+        except Exception as e:
+            print(f"Error reading {f}: {e}")
+            trials.append({
+                "filename": f.name,
+                "title": f.stem,
+                "_id": f.stem
+            })
     return trials
 
 def get_cohorts() -> List[Dict[str, Any]]:
-    """Get list of available cohorts from config_files/pipeline_json_files/."""
-    cohorts_dir = BASE_DIR / "config_files" / "pipeline_json_files"
+    """Get all cohort files from pipeline_json_files directory."""
+    if not COHORT_FILES_DIR.exists():
+        return []
+    
     cohorts = []
-    if cohorts_dir.exists():
-        for f in cohorts_dir.glob("*.json"):
-            try:
-                data = load_json(f"config_files/pipeline_json_files/{f.name}")
-                patient_count = len(data) if isinstance(data, list) else 0
-                cohorts.append({
-                    "filename": f.name,
-                    "name": f.stem,
-                    "patient_count": patient_count
-                })
-            except:
-                cohorts.append({
-                    "filename": f.name,
-                    "name": f.stem,
-                    "patient_count": 0
-                })
+    for f in COHORT_FILES_DIR.glob("*.json"):
+        try:
+            with open(f, 'r') as file:
+                data = json.load(file)
+            cohorts.append({
+                "filename": f.name,
+                "name": f.stem,
+                "patient_count": len(data) if isinstance(data, list) else 0
+            })
+        except Exception as e:
+            print(f"Error reading {f}: {e}")
+            cohorts.append({
+                "filename": f.name,
+                "name": f.stem,
+                "patient_count": 0
+            })
     return cohorts
 
 def get_active_config() -> Dict[str, Any]:
     """Load the active configuration."""
-    return load_json("config_files/overall_config_settings/active_data_config.json")
+    if OVERALL_CONFIG.exists():
+        try:
+            with open(OVERALL_CONFIG, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+    return {}
 
 def save_active_config(config: Dict[str, Any]) -> bool:
-    """Save configuration with versioning."""
+    """Save configuration with versioning and auto-generated paths."""
+    cohort_name = config.get("cohortName", "default")
+    
+    # Auto-generate paths based on cohortName
+    config["pdf_data_dir"] = f"documents/pdfs/{cohort_name}"
+    config["ocr_data_dir"] = f"documents/ocr/{cohort_name}"
+    config["llm_summarization_result_dir"] = f"results_dir/llm_summarization/{cohort_name}"
+    config["matching_result_dir"] = f"results_dir/matching/{cohort_name}"
+    config["extracted_features_path"] = f"results_dir/llm_summarization/{cohort_name}/patient_feature_summaries_{cohort_name}.csv"
+    config["evaluation_results_path"] = f"results_dir/evaluation/matching_results_summary_{cohort_name}.xlsx"
+    
+    # Create directories if needed
+    (BASE_DIR / config["matching_result_dir"]).mkdir(parents=True, exist_ok=True)
+    (BASE_DIR / config["llm_summarization_result_dir"]).mkdir(parents=True, exist_ok=True)
+    
     # Create timestamped backup
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    cohort_name = config.get("cohortName", "")
     backup_filename = f"data_config_{cohort_name}__{timestamp}.json"
-    
-    # Save backup
     save_json(f"config_files/overall_config_settings/{backup_filename}", config)
     
     # Save as active config
     return save_json("config_files/overall_config_settings/active_data_config.json", config)
 
 def assemble_cohort(criteria_list: List[str], cohort_source: str, max_patients: int) -> Dict[str, Any]:
-    """
-    Assemble a cohort based on search criteria.
-    Returns matched patient IDs and count.
-    """
+    """Assemble a cohort based on search criteria."""
     try:
-        cohort = load_json(f"config_files/pipeline_json_files/{cohort_source}")
+        cohort_path = COHORT_FILES_DIR / cohort_source
+        if not cohort_path.exists():
+            return {"matched_count": 0, "patient_ids_list": []}
+        
+        with open(cohort_path, 'r') as f:
+            cohort = json.load(f)
+        
         if not isinstance(cohort, list):
             return {"matched_count": 0, "patient_ids_list": []}
         
@@ -324,9 +402,10 @@ def assemble_cohort(criteria_list: List[str], cohort_source: str, max_patients: 
         st.error(f"Error assembling cohort: {e}")
         return {"matched_count": 0, "patient_ids_list": []}
 
-def generate_pipeline_command(config_path: str, run_ocr: bool, do_llm_summarization: bool, 
+def generate_pipeline_command(run_ocr: bool, do_llm_summarization: bool, 
                               do_patient_matching: bool, do_evaluation: bool) -> str:
     """Generate the pipeline command string for display/debugging."""
+    config_path = "config_files/overall_config_settings/active_data_config.json"
     return (f"python orchestrate_pipeline.py "
             f"--data_config_json {config_path} "
             f"--run_ocr {run_ocr} "
@@ -334,40 +413,26 @@ def generate_pipeline_command(config_path: str, run_ocr: bool, do_llm_summarizat
             f"--do_patient_matching {do_patient_matching} "
             f"--do_evaluation {do_evaluation}")
 
-def run_pipeline(config_path: str, run_ocr: bool, do_llm_summarization: bool, 
+def run_pipeline(run_ocr: bool, do_llm_summarization: bool, 
                  do_patient_matching: bool, do_evaluation: bool) -> Dict[str, Any]:
-    """
-    Run Noah's pipeline directly and return results.
-    
-    Args:
-        config_path: Path to the config JSON file (relative to BASE_DIR)
-        run_ocr: Whether to run OCR step
-        do_llm_summarization: Whether to run LLM summarization
-        do_patient_matching: Whether to run patient matching
-        do_evaluation: Whether to run evaluation
-    
-    Returns:
-        Dictionary with success status, stdout, stderr, or error message
-    """
-    # Path to pipeline script (Noah will place it in app/data/Sigmatch/)
-    pipeline_script = BASE_DIR / "orchestrate_pipeline.py"
+    """Run Noah's pipeline directly and return results."""
     
     # Check if pipeline script exists
-    if not pipeline_script.exists():
+    if not PIPELINE_SCRIPT.exists():
         return {
-            "error": (
-                f"orchestrate_pipeline.py not found at:\n{pipeline_script}\n\n"
-                "Please add your pipeline script to:\n"
-                f"{BASE_DIR}/orchestrate_pipeline.py"
-            ),
+            "error": f"Pipeline script not found at:\n{PIPELINE_SCRIPT}\n\n"
+                     f"orchestrate_pipeline.py should be in the sigmatch root folder:\n{BASE_DIR}",
+            "hint": "Make sure orchestrate_pipeline.py is in the correct location",
             "success": False
         }
     
-    # Build command with proper boolean conversion
+    config_path = "config_files/overall_config_settings/active_data_config.json"
+    
+    # Build command
     cmd = [
         sys.executable,  # Use current Python interpreter
-        str(pipeline_script),
-        "--data_config_json", str(BASE_DIR / config_path),
+        str(PIPELINE_SCRIPT),
+        "--data_config_json", config_path,
         "--run_ocr", str(run_ocr),
         "--do_llm_summarization", str(do_llm_summarization),
         "--do_patient_matching", str(do_patient_matching),
@@ -378,10 +443,10 @@ def run_pipeline(config_path: str, run_ocr: bool, do_llm_summarization: bool,
         # Set up environment - inherit current environment
         env = os.environ.copy()
         
-        # Run pipeline with timeout
+        # Run pipeline with timeout from BASE_DIR
         result = subprocess.run(
             cmd,
-            cwd=str(BASE_DIR),
+            cwd=str(BASE_DIR),  # Run from sigmatch root
             capture_output=True,
             text=True,
             timeout=3600,  # 1 hour timeout
@@ -420,16 +485,14 @@ def run_pipeline(config_path: str, run_ocr: bool, do_llm_summarization: bool,
 def save_snapshot() -> str:
     """Save a snapshot of all config files."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    snapshot_dir = BASE_DIR / "snapshots" / f"snapshot_{timestamp}"
+    snapshot_dir = SNAPSHOTS_DIR / f"snapshot_{timestamp}"
     
     try:
         snapshot_dir.mkdir(parents=True, exist_ok=True)
         
         # Copy config files
-        config_source = BASE_DIR / "config_files"
-        config_dest = snapshot_dir / "config_files"
-        if config_source.exists():
-            shutil.copytree(config_source, config_dest)
+        if CONFIG_DIR.exists():
+            shutil.copytree(CONFIG_DIR, snapshot_dir / "config_files")
         
         return str(snapshot_dir)
     except Exception as e:
@@ -437,7 +500,13 @@ def save_snapshot() -> str:
 
 def get_prompts() -> Dict[str, Any]:
     """Load prompt settings."""
-    return load_json("config_files/prompt_settings/sigmatch_standard_prompt_content.json")
+    if PROMPT_SETTINGS.exists():
+        try:
+            with open(PROMPT_SETTINGS, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading prompts: {e}")
+    return {}
 
 def save_prompts(prompts: Dict[str, Any]) -> bool:
     """Save prompt settings with versioning."""
@@ -452,24 +521,37 @@ def save_prompts(prompts: Dict[str, Any]) -> bool:
 def get_results_summary() -> Dict[str, Any]:
     """Get summary of matching results."""
     config = get_active_config()
-    cohort_name = config.get("cohortName", "default_cohort")
+    cohort_name = config.get("cohortName", "unknown")
+    matching_result_dir = config.get("matching_result_dir", "")
     
-    results_path = BASE_DIR / "results_dir" / "matching" / cohort_name / "matching_results.csv"
+    # Build results path
+    if matching_result_dir:
+        results_csv = BASE_DIR / matching_result_dir / "matching_results.csv"
+    else:
+        results_csv = MATCHING_DIR / cohort_name / "matching_results.csv"
     
-    if not results_path.exists():
-        return {"has_results": False}
+    if not results_csv.exists():
+        return {
+            "has_results": False,
+            "cohort_name": cohort_name,
+            "total_patients": 0,
+            "matched_count": 0,
+            "not_matched_count": 0,
+            "match_percentage": 0,
+            "score_distribution": {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
+        }
     
     try:
-        df = pd.read_csv(results_path)
+        df = pd.read_csv(results_csv)
         
         total = len(df)
         matched = len(df[df['final_decision'] == 'MATCH'])
         not_matched = total - matched
-        match_pct = (matched / total * 100) if total > 0 else 0
+        match_pct = round(matched / total * 100, 1) if total > 0 else 0
         
         # Score distribution
         score_dist = df['overall_score'].value_counts().to_dict()
-        score_dist = {str(k): int(v) for k, v in score_dist.items()}
+        score_distribution = {str(i): score_dist.get(i, 0) for i in range(1, 6)}
         
         return {
             "has_results": True,
@@ -478,7 +560,7 @@ def get_results_summary() -> Dict[str, Any]:
             "matched_count": matched,
             "not_matched_count": not_matched,
             "match_percentage": match_pct,
-            "score_distribution": score_dist,
+            "score_distribution": score_distribution,
             "dataframe": df
         }
     except Exception as e:
@@ -500,21 +582,96 @@ if 'config' not in st.session_state:
 if 'chat_messages' not in st.session_state:
     st.session_state.chat_messages = []
 
-if 'generated_command' not in st.session_state:
-    st.session_state.generated_command = ''
-
 if 'prompts' not in st.session_state:
     st.session_state.prompts = get_prompts()
 
 if 'pipeline_result' not in st.session_state:
     st.session_state.pipeline_result = None
 
-if 'pipeline_running' not in st.session_state:
-    st.session_state.pipeline_running = False
-
 # =============================================================================
 # PAGE FUNCTIONS
 # =============================================================================
+
+def page_setup_paths():
+    """Setup & Paths page - Verify file structure."""
+    st.markdown('<p class="main-header">📁 Setup & File Paths</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Verify your file structure and paths</p>', unsafe_allow_html=True)
+    
+    paths = get_paths_info()
+    
+    # Check what exists
+    pipeline_exists = PIPELINE_SCRIPT.exists()
+    config_exists = OVERALL_CONFIG.exists()
+    trials_exist = len(list(TRIAL_FILES_DIR.glob("*.json"))) > 0 if TRIAL_FILES_DIR.exists() else False
+    cohorts_exist = len(list(COHORT_FILES_DIR.glob("*.json"))) > 0 if COHORT_FILES_DIR.exists() else False
+    
+    st.subheader("Status Check")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if pipeline_exists:
+            st.success("✅ orchestrate_pipeline.py found")
+        else:
+            st.error("❌ orchestrate_pipeline.py NOT found")
+        
+        if config_exists:
+            st.success("✅ Config file found")
+        else:
+            st.warning("⚠️ Config file missing (will be created)")
+    
+    with col2:
+        if trials_exist:
+            trial_count = len(list(TRIAL_FILES_DIR.glob("*.json")))
+            st.success(f"✅ Trial files found ({trial_count} files)")
+        else:
+            st.warning("⚠️ No trial files")
+        
+        if cohorts_exist:
+            cohort_count = len(list(COHORT_FILES_DIR.glob("*.json")))
+            st.success(f"✅ Cohort files found ({cohort_count} files)")
+        else:
+            st.warning("⚠️ No cohort files")
+    
+    st.divider()
+    
+    st.subheader("Expected File Structure")
+    st.code(f"""
+{paths['base_dir']}/
+├── orchestrate_pipeline.py      ← Pipeline script {'✅' if pipeline_exists else '❌'}
+├── config_files/
+│   ├── overall_config_settings/
+│   │   └── active_data_config.json {'✅' if config_exists else '⚠️'}
+│   ├── prompt_settings/
+│   │   └── sigmatch_standard_prompt_content.json
+│   ├── trial_files/
+│   │   └── *.json               ← Trial files {'✅' if trials_exist else '⚠️'}
+│   └── pipeline_json_files/
+│       └── *.json               ← Patient cohorts {'✅' if cohorts_exist else '⚠️'}
+├── documents/
+│   ├── ocr/
+│   └── pdfs/
+├── results_dir/
+│   └── matching/
+│       └── {{cohort_name}}/
+│           └── matching_results.csv
+│
+└── streamlit_front_end_(rodela)/
+    └── app.py                   ← This app (YOU ARE HERE)
+    """)
+    
+    st.divider()
+    
+    st.subheader("Resolved Paths")
+    for name, path in paths.items():
+        exists = Path(path).exists()
+        icon = "✅" if exists else "❌"
+        st.text(f"{icon} {name}: {path}")
+    
+    st.divider()
+    
+    if st.button("🔄 Refresh Status"):
+        st.rerun()
+
 
 def page_configure():
     """Configure Pipeline page - Main configuration interface."""
@@ -623,17 +780,21 @@ def page_configure():
         st.markdown("### 📄 Trial Selection")
         st.markdown("Choose or upload a clinical trial")
         
-        # Trial dropdown
-        trial_options = {t['filename']: t['title'] for t in trials}
-        current_trial = config.get('trial_file_config_path', '').split('/')[-1] if config.get('trial_file_config_path') else None
-        
-        selected_trial = st.selectbox(
-            "Select Trial",
-            options=list(trial_options.keys()),
-            format_func=lambda x: trial_options.get(x, x),
-            index=list(trial_options.keys()).index(current_trial) if current_trial in trial_options else 0,
-            key="selected_trial"
-        )
+        if not trials:
+            st.warning("No trial files found. Add trial JSON files to config_files/trial_files/")
+            selected_trial = None
+        else:
+            # Trial dropdown
+            trial_options = {t['filename']: t['title'] for t in trials}
+            current_trial = config.get('trial_file_config_path', '').split('/')[-1] if config.get('trial_file_config_path') else None
+            
+            selected_trial = st.selectbox(
+                "Select Trial",
+                options=list(trial_options.keys()),
+                format_func=lambda x: trial_options.get(x, x),
+                index=list(trial_options.keys()).index(current_trial) if current_trial in trial_options else 0,
+                key="selected_trial"
+            )
         
         # File upload
         uploaded_file = st.file_uploader("Upload Trial JSON", type=['json'], key="trial_upload")
@@ -675,13 +836,18 @@ def page_configure():
         # Get cohort names from directory
         cohort_names = [c['name'] for c in cohorts]
         
-        # Radio selection for cohorts
-        cohort_type = st.radio(
-            "Choose cohort",
-            options=cohort_names + ['custom'] if cohort_names else ['custom'],
-            key="cohort_type"
-        )
+        if not cohort_names:
+            st.warning("No cohort files found. Add cohort JSON files to config_files/pipeline_json_files/")
+            cohort_type = 'custom'
+        else:
+            # Radio selection for cohorts
+            cohort_type = st.radio(
+                "Choose cohort",
+                options=cohort_names + ['custom'],
+                key="cohort_type"
+            )
         
+        custom_path = ""
         if cohort_type == 'custom':
             custom_path = st.text_input(
                 "Custom Path",
@@ -725,19 +891,8 @@ def page_configure():
                 **config,
                 "cohortName": cohort_name,
                 "trial_file_config_path": f"config_files/trial_files/{selected_trial}" if selected_trial else "",
-                "patients_file_path": f"config_files/pipeline_json_files/{cohort_type}.json" if cohort_type != 'custom' else custom_path if 'custom_path' in dir() else "",
+                "patients_file_path": f"config_files/pipeline_json_files/{cohort_type}.json" if cohort_type != 'custom' else custom_path,
             }
-            
-            # Auto-generate paths based on cohortName
-            if cohort_name:
-                updated_config.update({
-                    "pdf_data_dir": f"documents/pdfs/{cohort_name}",
-                    "ocr_data_dir": f"documents/ocr/{cohort_name}",
-                    "llm_summarization_result_dir": f"results_dir/llm_summarization/{cohort_name}",
-                    "matching_result_dir": f"results_dir/matching/{cohort_name}",
-                    "extracted_features_path": f"results_dir/llm_summarization/{cohort_name}/patient_feature_summaries_{cohort_name}.csv",
-                    "evaluation_results_path": f"results_dir/evaluation/matching_results_summary_{cohort_name}.xlsx"
-                })
             
             save_active_config(updated_config)
             st.session_state.config = updated_config
@@ -745,7 +900,6 @@ def page_configure():
             # Show progress
             with st.spinner("🔄 Running pipeline... This may take several minutes."):
                 result = run_pipeline(
-                    config_path="config_files/overall_config_settings/active_data_config.json",
                     run_ocr=run_ocr,
                     do_llm_summarization=do_llm_summarization,
                     do_patient_matching=do_patient_matching,
@@ -756,6 +910,8 @@ def page_configure():
             # Display results
             if result.get("error"):
                 st.error(f"❌ Pipeline failed: {result['error']}")
+                if result.get("hint"):
+                    st.info(f"💡 Hint: {result['hint']}")
             elif result.get("success"):
                 st.success("✅ Pipeline completed successfully!")
                 st.balloons()
@@ -795,19 +951,8 @@ def page_configure():
                     **config,
                     "cohortName": cohort_name,
                     "trial_file_config_path": f"config_files/trial_files/{selected_trial}" if selected_trial else "",
-                    "patients_file_path": f"config_files/pipeline_json_files/{cohort_type}.json" if cohort_type != 'custom' else custom_path if 'custom_path' in dir() else "",
+                    "patients_file_path": f"config_files/pipeline_json_files/{cohort_type}.json" if cohort_type != 'custom' else custom_path,
                 }
-                
-                # Auto-generate paths based on cohortName
-                if cohort_name:
-                    updated_config.update({
-                        "pdf_data_dir": f"documents/pdfs/{cohort_name}",
-                        "ocr_data_dir": f"documents/ocr/{cohort_name}",
-                        "llm_summarization_result_dir": f"results_dir/llm_summarization/{cohort_name}",
-                        "matching_result_dir": f"results_dir/matching/{cohort_name}",
-                        "extracted_features_path": f"results_dir/llm_summarization/{cohort_name}/patient_feature_summaries_{cohort_name}.csv",
-                        "evaluation_results_path": f"results_dir/evaluation/matching_results_summary_{cohort_name}.xlsx"
-                    })
                 
                 if save_active_config(updated_config):
                     st.session_state.config = updated_config
@@ -816,7 +961,6 @@ def page_configure():
         # Debug command expander
         with st.expander("🔧 View Pipeline Command (for debugging)"):
             cmd_str = generate_pipeline_command(
-                "config_files/overall_config_settings/active_data_config.json",
                 run_ocr, do_llm_summarization, do_patient_matching, do_evaluation
             )
             st.code(cmd_str, language="bash")
@@ -896,7 +1040,7 @@ def page_adjust_prompts():
                     if save_prompts(st.session_state.prompts):
                         st.success(f"{agent_labels.get(agent_name, agent_name)} saved!")
     else:
-        st.warning("No prompts found. Check your prompt settings file.")
+        st.warning("No prompts found. Check your prompt settings file at config_files/prompt_settings/")
 
 
 def page_evaluation_criteria():
@@ -1013,9 +1157,6 @@ def page_review_results():
         {"id": "PT-003", "decision": "Matched", "score": 4.8, "status": "approved"},
         {"id": "PT-004", "decision": "Matched", "score": 3.5, "status": "rejected"},
     ]
-    
-    # Create DataFrame
-    df = pd.DataFrame(dummy_patients)
     
     # Display table with custom formatting
     st.markdown("---")
@@ -1181,6 +1322,11 @@ def page_results_summary():
     
     df = summary['dataframe']
     
+    # Check which columns exist
+    display_cols = ['patient_id', 'final_decision', 'overall_score']
+    if 'primary_reasons' in df.columns:
+        display_cols.append('primary_reasons')
+    
     # Style the dataframe
     def color_decision(val):
         if val == 'MATCH':
@@ -1188,7 +1334,7 @@ def page_results_summary():
         else:
             return 'background-color: #fee2e2; color: #991b1b;'
     
-    styled_df = df[['patient_id', 'final_decision', 'overall_score', 'primary_reasons']].style.applymap(
+    styled_df = df[display_cols].style.applymap(
         color_decision, subset=['final_decision']
     )
     
@@ -1207,6 +1353,7 @@ def main():
     st.sidebar.markdown("---")
     
     pages = {
+        "Setup / Paths": page_setup_paths,
         "Configure": page_configure,
         "Adjust Prompts": page_adjust_prompts,
         "Evaluation Criteria": page_evaluation_criteria,
@@ -1215,6 +1362,7 @@ def main():
     }
     
     page_icons = {
+        "Setup / Paths": "📁",
         "Configure": "⚙️",
         "Adjust Prompts": "🤖",
         "Evaluation Criteria": "📋",
@@ -1240,10 +1388,13 @@ def main():
         trial_name = trial_path.split('/')[-1].replace('.json', '') if trial_path else 'Not set'
         st.sidebar.markdown(f"**Trial:** {trial_name}")
     
+    # Show BASE_DIR in sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.caption(f"📂 Base: {BASE_DIR}")
+    
     # Render selected page
     pages[selection]()
 
 
 if __name__ == "__main__":
     main()
-
