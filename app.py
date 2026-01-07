@@ -1,6 +1,6 @@
 """
 Sigmatch Streamlit App - Clinical Trial Matching Interface
-Replicates the Lovable React frontend functionality
+Powered by Natera
 
 FILE STRUCTURE (Noah's SageMaker):
 /sigmatch/                              ← Parent directory (BASE_DIR)
@@ -29,10 +29,6 @@ import os
 # PATH CONFIGURATION
 # =============================================================================
 
-# Streamlit app is in: /sigmatch/streamlit_frontend/app.py
-# Data files are in:   /sigmatch/
-# So we go ONE LEVEL UP from the app's directory
-
 BASE_DIR = Path(__file__).resolve().parent.parent  # Goes up to /sigmatch/
 
 # Config files
@@ -53,191 +49,345 @@ MATCHING_DIR = RESULTS_DIR / "matching"
 LLM_SUMMARIZATION_DIR = RESULTS_DIR / "llm_summarization"
 EVALUATION_DIR = RESULTS_DIR / "evaluation"
 
-# Pipeline script (at root level, same as BASE_DIR)
+# Pipeline script
 PIPELINE_SCRIPT = BASE_DIR / "orchestrate_pipeline.py"
 
 # Snapshots
 SNAPSHOTS_DIR = BASE_DIR / "snapshots"
 
 # =============================================================================
+# NATERA BRAND COLORS
+# =============================================================================
+
+NATERA_GREEN = "#8CC63F"
+NATERA_BLUE = "#00AEEF"
+NATERA_DARK_GREEN = "#6BA32E"
+NATERA_DARK_BLUE = "#0091C9"
+NATERA_LIGHT_GREEN = "#C5E1A5"
+NATERA_LIGHT_BLUE = "#B3E5FC"
+
+# Natera Logo (base64 encoded SVG for reliability)
+NATERA_LOGO_URL = "https://www.natera.com/wp-content/uploads/2023/06/natera-logo.svg"
+
+# =============================================================================
 # STREAMLIT CONFIGURATION
 # =============================================================================
 
 st.set_page_config(
-    page_title="Sigmatch",
-    page_icon="🔬",
+    page_title="Sigmatch | Natera",
+    page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # =============================================================================
-# CUSTOM CSS STYLING
+# CUSTOM CSS STYLING - NATERA THEME
 # =============================================================================
 
-st.markdown("""
+st.markdown(f"""
 <style>
-    /* Main theme colors */
-    :root {
-        --primary: #3b82f6;
-        --primary-hover: #2563eb;
-        --success: #22c55e;
-        --destructive: #ef4444;
-        --muted: #f1f5f9;
-        --border: #e2e8f0;
-    }
+    /* Natera theme colors */
+    :root {{
+        --natera-green: {NATERA_GREEN};
+        --natera-blue: {NATERA_BLUE};
+        --natera-dark-green: {NATERA_DARK_GREEN};
+        --natera-dark-blue: {NATERA_DARK_BLUE};
+        --natera-light-green: {NATERA_LIGHT_GREEN};
+        --natera-light-blue: {NATERA_LIGHT_BLUE};
+    }}
     
-    /* Button styling */
-    .stButton>button {
-        background-color: #3b82f6;
+    /* Primary button - Natera Green */
+    .stButton>button[kind="primary"] {{
+        background: linear-gradient(135deg, {NATERA_GREEN} 0%, {NATERA_DARK_GREEN} 100%);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(140, 198, 63, 0.3);
+    }}
+    .stButton>button[kind="primary"]:hover {{
+        background: linear-gradient(135deg, {NATERA_DARK_GREEN} 0%, {NATERA_GREEN} 100%);
+        box-shadow: 0 4px 8px rgba(140, 198, 63, 0.4);
+        transform: translateY(-1px);
+    }}
+    
+    /* Secondary button - Natera Blue */
+    .stButton>button {{
+        background: linear-gradient(135deg, {NATERA_BLUE} 0%, {NATERA_DARK_BLUE} 100%);
         color: white;
         border: none;
         border-radius: 0.5rem;
         padding: 0.5rem 1rem;
         font-weight: 500;
-        transition: background-color 0.2s;
-    }
-    .stButton>button:hover {
-        background-color: #2563eb;
-    }
+        transition: all 0.3s ease;
+    }}
+    .stButton>button:hover {{
+        background: linear-gradient(135deg, {NATERA_DARK_BLUE} 0%, {NATERA_BLUE} 100%);
+        transform: translateY(-1px);
+    }}
     
-    /* Secondary button */
-    .secondary-btn button {
-        background-color: #f1f5f9 !important;
-        color: #1e293b !important;
-    }
-    .secondary-btn button:hover {
-        background-color: #e2e8f0 !important;
-    }
+    /* Success messages - Green theme */
+    .stSuccess {{
+        background-color: {NATERA_LIGHT_GREEN} !important;
+        border-left: 4px solid {NATERA_GREEN} !important;
+    }}
     
-    /* Success box */
-    .success-box {
-        padding: 1rem;
-        background-color: #dcfce7;
-        border-radius: 0.5rem;
-        border: 1px solid #86efac;
-        margin: 0.5rem 0;
-    }
+    /* Info messages - Blue theme */
+    .stInfo {{
+        background-color: {NATERA_LIGHT_BLUE} !important;
+        border-left: 4px solid {NATERA_BLUE} !important;
+    }}
     
-    /* Error box */
-    .error-box {
-        padding: 1rem;
-        background-color: #fee2e2;
-        border-radius: 0.5rem;
-        border: 1px solid #fca5a5;
-        margin: 0.5rem 0;
-    }
-    
-    /* Info box */
-    .info-box {
-        padding: 1rem;
-        background-color: #dbeafe;
-        border-radius: 0.5rem;
-        border: 1px solid #93c5fd;
-        margin: 0.5rem 0;
-    }
-    
-    /* Card styling */
-    .card {
-        background-color: white;
-        border-radius: 0.75rem;
-        border: 1px solid #e2e8f0;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-    }
-    
-    /* Patient ID badge */
-    .patient-badge {
+    /* Patient ID badge - Natera Blue */
+    .patient-badge {{
         display: inline-flex;
         align-items: center;
         padding: 0.25rem 0.75rem;
-        background-color: #dbeafe;
-        color: #1d4ed8;
+        background-color: {NATERA_LIGHT_BLUE};
+        color: {NATERA_DARK_BLUE};
         border-radius: 9999px;
         font-size: 0.875rem;
         font-weight: 500;
         margin: 0.25rem;
-        border: 1px solid #93c5fd;
-    }
+        border: 1px solid {NATERA_BLUE};
+    }}
     
-    /* Chat message styling */
-    .user-message {
-        background-color: #3b82f6;
+    /* Chat messages */
+    .user-message {{
+        background: linear-gradient(135deg, {NATERA_BLUE} 0%, {NATERA_DARK_BLUE} 100%);
         color: white;
         padding: 0.75rem 1rem;
         border-radius: 1rem;
         margin: 0.5rem 0;
         max-width: 80%;
         margin-left: auto;
-    }
+    }}
     
-    .assistant-message {
-        background-color: #f1f5f9;
-        color: #1e293b;
+    .assistant-message {{
+        background: linear-gradient(135deg, {NATERA_LIGHT_GREEN} 0%, #E8F5E9 100%);
+        color: #1B5E20;
         padding: 0.75rem 1rem;
         border-radius: 1rem;
         margin: 0.5rem 0;
         max-width: 80%;
-    }
+    }}
     
-    /* Stat card */
-    .stat-card {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    /* Stat cards - Natera gradient */
+    .stat-card {{
+        background: linear-gradient(135deg, #ffffff 0%, {NATERA_LIGHT_BLUE} 100%);
         border-radius: 0.75rem;
         padding: 1.25rem;
-        border: 1px solid #e2e8f0;
-    }
+        border: 1px solid {NATERA_BLUE}33;
+        box-shadow: 0 2px 8px rgba(0, 174, 239, 0.1);
+    }}
     
-    /* Code block */
-    .code-block {
-        background-color: #1e293b;
-        color: #e2e8f0;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 0.875rem;
-        overflow-x: auto;
-    }
-    
-    /* Header styling */
-    .main-header {
+    /* Header styling with Natera colors */
+    .main-header {{
         font-size: 1.75rem;
         font-weight: 600;
-        color: #0f172a;
+        background: linear-gradient(90deg, {NATERA_GREEN} 0%, {NATERA_BLUE} 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         margin-bottom: 0.5rem;
-    }
+    }}
     
-    .sub-header {
+    .sub-header {{
         color: #64748b;
         font-size: 1rem;
         margin-bottom: 1.5rem;
-    }
+    }}
     
-    /* Results display */
-    .results-container {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
+    /* Results container */
+    .results-container {{
+        background: linear-gradient(135deg, #f8fafc 0%, {NATERA_LIGHT_BLUE}40 100%);
+        border: 1px solid {NATERA_BLUE}33;
         border-radius: 0.5rem;
         padding: 1rem;
         min-height: 200px;
-    }
+    }}
+    
+    /* Activity log styling */
+    .activity-log {{
+        background-color: #1a1a2e;
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.75rem;
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid {NATERA_BLUE}66;
+    }}
+    
+    .log-entry {{
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #333;
+        color: #e0e0e0;
+    }}
+    
+    .log-time {{
+        color: {NATERA_GREEN};
+        font-weight: 500;
+    }}
+    
+    .log-action {{
+        color: {NATERA_BLUE};
+    }}
+    
+    .log-path {{
+        color: #888;
+        font-size: 0.7rem;
+    }}
+    
+    /* Natera logo container */
+    .natera-logo {{
+        text-align: center;
+        padding: 1rem 0;
+        margin-bottom: 0.5rem;
+    }}
+    
+    .natera-logo img {{
+        max-width: 150px;
+        height: auto;
+    }}
     
     /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
     
-    /* Sidebar styling */
-    .css-1d391kg {
-        background-color: #f8fafc;
-    }
+    /* Sidebar with Natera accent */
+    section[data-testid="stSidebar"] {{
+        background: linear-gradient(180deg, #ffffff 0%, {NATERA_LIGHT_BLUE}30 100%);
+        border-right: 2px solid {NATERA_BLUE}33;
+    }}
+    
+    /* Radio button styling */
+    .stRadio > div {{
+        gap: 0.25rem;
+    }}
     
     /* Metric styling */
-    [data-testid="stMetricValue"] {
+    [data-testid="stMetricValue"] {{
         font-size: 2rem;
         font-weight: 700;
-    }
+        color: {NATERA_DARK_BLUE};
+    }}
+    
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 0.5rem;
+    }}
+    
+    .stTabs [data-baseweb="tab"] {{
+        background-color: {NATERA_LIGHT_BLUE}50;
+        border-radius: 0.5rem 0.5rem 0 0;
+    }}
+    
+    .stTabs [aria-selected="true"] {{
+        background-color: {NATERA_BLUE} !important;
+        color: white !important;
+    }}
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {{
+        background-color: {NATERA_LIGHT_BLUE}30;
+        border-radius: 0.5rem;
+    }}
+    
+    /* Toast notification styling */
+    .toast-notification {{
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        background: linear-gradient(135deg, {NATERA_GREEN} 0%, {NATERA_DARK_GREEN} 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 9999;
+        animation: slideIn 0.3s ease-out;
+    }}
+    
+    @keyframes slideIn {{
+        from {{
+            transform: translateX(100%);
+            opacity: 0;
+        }}
+        to {{
+            transform: translateX(0);
+            opacity: 1;
+        }}
+    }}
 </style>
 """, unsafe_allow_html=True)
+
+# =============================================================================
+# ACTIVITY LOG FUNCTIONS
+# =============================================================================
+
+def init_activity_log():
+    """Initialize activity log in session state."""
+    if 'activity_log' not in st.session_state:
+        st.session_state.activity_log = []
+
+def log_activity(action: str, details: str = "", path: str = ""):
+    """Add an entry to the activity log."""
+    init_activity_log()
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    entry = {
+        "time": timestamp,
+        "action": action,
+        "details": details,
+        "path": path
+    }
+    st.session_state.activity_log.insert(0, entry)  # Most recent first
+    # Keep only last 50 entries
+    st.session_state.activity_log = st.session_state.activity_log[:50]
+
+def show_toast(message: str, icon: str = "✓"):
+    """Show a toast notification."""
+    st.toast(f"{icon} {message}")
+
+def show_action_dialog(title: str, message: str, details: str = ""):
+    """Show a dialog for important actions."""
+    with st.expander(f"📋 {title}", expanded=True):
+        st.info(message)
+        if details:
+            st.code(details, language="text")
+
+def render_activity_log():
+    """Render the activity log in the sidebar."""
+    init_activity_log()
+    
+    st.sidebar.markdown("### 📋 Activity Log")
+    
+    if not st.session_state.activity_log:
+        st.sidebar.markdown("""
+        <div class="activity-log">
+            <p style="color: #666; text-align: center; padding: 1rem;">
+                No activity yet.<br>Actions will appear here.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        log_html = '<div class="activity-log">'
+        for entry in st.session_state.activity_log[:15]:  # Show last 15
+            log_html += f'''
+            <div class="log-entry">
+                <span class="log-time">[{entry["time"]}]</span> 
+                <span class="log-action">{entry["action"]}</span>
+                {f'<br><span class="log-path">→ {entry["path"]}</span>' if entry.get("path") else ""}
+            </div>
+            '''
+        log_html += '</div>'
+        st.sidebar.markdown(log_html, unsafe_allow_html=True)
+    
+    # Clear log button
+    if st.sidebar.button("🗑️ Clear Log", use_container_width=True):
+        st.session_state.activity_log = []
+        st.rerun()
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -267,16 +417,22 @@ def load_json(relative_path: str) -> Optional[Dict[str, Any]]:
         print(f"Error loading {relative_path}: {e}")
         return None
 
-def save_json(relative_path: str, data: Dict[str, Any]) -> bool:
+def save_json(relative_path: str, data: Dict[str, Any], log_action: bool = True) -> bool:
     """Save JSON file to path relative to BASE_DIR."""
     try:
         full_path = BASE_DIR / relative_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         with open(full_path, 'w') as f:
             json.dump(data, f, indent=2)
+        
+        if log_action:
+            log_activity("FILE SAVED", f"Saved JSON data", relative_path)
+            show_toast(f"Saved: {relative_path.split('/')[-1]}")
+        
         return True
     except Exception as e:
         st.error(f"Error saving file: {e}")
+        log_activity("ERROR", f"Failed to save: {e}", relative_path)
         return False
 
 def get_trials() -> List[Dict[str, str]]:
@@ -356,10 +512,15 @@ def save_active_config(config: Dict[str, Any]) -> bool:
     # Create timestamped backup
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_filename = f"data_config_{cohort_name}__{timestamp}.json"
-    save_json(f"config_files/overall_config_settings/{backup_filename}", config)
+    backup_path = f"config_files/overall_config_settings/{backup_filename}"
+    save_json(backup_path, config, log_action=False)
+    
+    # Log the activity
+    log_activity("CONFIG SAVED", f"Cohort: {cohort_name}", backup_path)
+    show_toast(f"Config saved for cohort: {cohort_name}", "💾")
     
     # Save as active config
-    return save_json("config_files/overall_config_settings/active_data_config.json", config)
+    return save_json("config_files/overall_config_settings/active_data_config.json", config, log_action=False)
 
 def assemble_cohort(criteria_list: List[str], cohort_source: str, max_patients: int) -> Dict[str, Any]:
     """Assemble a cohort based on search criteria."""
@@ -394,12 +555,16 @@ def assemble_cohort(criteria_list: List[str], cohort_source: str, max_patients: 
             if all_match:
                 matched.append(patient.get('patient_id', 'Unknown'))
         
+        log_activity("COHORT ASSEMBLED", f"Found {len(matched)} patients from {cohort_source}")
+        show_toast(f"Found {len(matched)} matching patients", "🔍")
+        
         return {
             "matched_count": len(matched),
             "patient_ids_list": matched
         }
     except Exception as e:
         st.error(f"Error assembling cohort: {e}")
+        log_activity("ERROR", f"Cohort assembly failed: {e}")
         return {"matched_count": 0, "patient_ids_list": []}
 
 def generate_pipeline_command(run_ocr: bool, do_llm_summarization: bool, 
@@ -417,8 +582,11 @@ def run_pipeline(run_ocr: bool, do_llm_summarization: bool,
                  do_patient_matching: bool, do_evaluation: bool) -> Dict[str, Any]:
     """Run Noah's pipeline directly and return results."""
     
+    log_activity("PIPELINE STARTED", f"OCR={run_ocr}, LLM={do_llm_summarization}, Match={do_patient_matching}, Eval={do_evaluation}")
+    
     # Check if pipeline script exists
     if not PIPELINE_SCRIPT.exists():
+        log_activity("ERROR", "Pipeline script not found", str(PIPELINE_SCRIPT))
         return {
             "error": f"Pipeline script not found at:\n{PIPELINE_SCRIPT}\n\n"
                      f"orchestrate_pipeline.py should be in the sigmatch root folder:\n{BASE_DIR}",
@@ -430,7 +598,7 @@ def run_pipeline(run_ocr: bool, do_llm_summarization: bool,
     
     # Build command
     cmd = [
-        sys.executable,  # Use current Python interpreter
+        sys.executable,
         str(PIPELINE_SCRIPT),
         "--data_config_json", config_path,
         "--run_ocr", str(run_ocr),
@@ -440,18 +608,21 @@ def run_pipeline(run_ocr: bool, do_llm_summarization: bool,
     ]
     
     try:
-        # Set up environment - inherit current environment
         env = os.environ.copy()
         
-        # Run pipeline with timeout from BASE_DIR
         result = subprocess.run(
             cmd,
-            cwd=str(BASE_DIR),  # Run from sigmatch root
+            cwd=str(BASE_DIR),
             capture_output=True,
             text=True,
-            timeout=3600,  # 1 hour timeout
+            timeout=3600,
             env=env
         )
+        
+        if result.returncode == 0:
+            log_activity("PIPELINE COMPLETED", "Success!", "results_dir/matching/")
+        else:
+            log_activity("PIPELINE FAILED", f"Exit code: {result.returncode}")
         
         return {
             "success": result.returncode == 0,
@@ -462,21 +633,13 @@ def run_pipeline(run_ocr: bool, do_llm_summarization: bool,
         }
         
     except subprocess.TimeoutExpired:
+        log_activity("ERROR", "Pipeline timed out after 1 hour")
         return {
             "error": "Pipeline timed out after 1 hour. The process may still be running.",
             "success": False
         }
-    except FileNotFoundError as e:
-        return {
-            "error": f"Python interpreter not found: {e}",
-            "success": False
-        }
-    except PermissionError as e:
-        return {
-            "error": f"Permission denied: {e}. Make sure orchestrate_pipeline.py is executable.",
-            "success": False
-        }
     except Exception as e:
+        log_activity("ERROR", f"Pipeline error: {str(e)}")
         return {
             "error": f"Unexpected error running pipeline: {str(e)}",
             "success": False
@@ -490,12 +653,15 @@ def save_snapshot() -> str:
     try:
         snapshot_dir.mkdir(parents=True, exist_ok=True)
         
-        # Copy config files
         if CONFIG_DIR.exists():
             shutil.copytree(CONFIG_DIR, snapshot_dir / "config_files")
         
+        log_activity("SNAPSHOT SAVED", f"snapshot_{timestamp}", str(snapshot_dir))
+        show_toast(f"Snapshot saved: {timestamp}", "📸")
+        
         return str(snapshot_dir)
     except Exception as e:
+        log_activity("ERROR", f"Snapshot failed: {e}")
         raise Exception(f"Failed to save snapshot: {e}")
 
 def get_prompts() -> Dict[str, Any]:
@@ -513,10 +679,15 @@ def save_prompts(prompts: Dict[str, Any]) -> bool:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # Backup current
-    save_json(f"config_files/prompt_settings/sigmatch_standard_prompt_content_{timestamp}.json", prompts)
+    backup_path = f"config_files/prompt_settings/sigmatch_standard_prompt_content_{timestamp}.json"
+    save_json(backup_path, prompts, log_action=False)
+    
+    # Log activity
+    log_activity("PROMPTS SAVED", f"Backup: {timestamp}", backup_path)
+    show_toast("Prompts saved successfully", "🤖")
     
     # Save as current
-    return save_json("config_files/prompt_settings/sigmatch_standard_prompt_content.json", prompts)
+    return save_json("config_files/prompt_settings/sigmatch_standard_prompt_content.json", prompts, log_action=False)
 
 def get_results_summary() -> Dict[str, Any]:
     """Get summary of matching results."""
@@ -524,7 +695,6 @@ def get_results_summary() -> Dict[str, Any]:
     cohort_name = config.get("cohortName", "unknown")
     matching_result_dir = config.get("matching_result_dir", "")
     
-    # Build results path
     if matching_result_dir:
         results_csv = BASE_DIR / matching_result_dir / "matching_results.csv"
     else:
@@ -549,7 +719,6 @@ def get_results_summary() -> Dict[str, Any]:
         not_matched = total - matched
         match_pct = round(matched / total * 100, 1) if total > 0 else 0
         
-        # Score distribution
         score_dist = df['overall_score'].value_counts().to_dict()
         score_distribution = {str(i): score_dist.get(i, 0) for i in range(1, 6)}
         
@@ -588,6 +757,8 @@ if 'prompts' not in st.session_state:
 if 'pipeline_result' not in st.session_state:
     st.session_state.pipeline_result = None
 
+init_activity_log()
+
 # =============================================================================
 # PAGE FUNCTIONS
 # =============================================================================
@@ -597,9 +768,10 @@ def page_setup_paths():
     st.markdown('<p class="main-header">📁 Setup & File Paths</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Verify your file structure and paths</p>', unsafe_allow_html=True)
     
+    log_activity("PAGE VIEW", "Setup / Paths")
+    
     paths = get_paths_info()
     
-    # Check what exists
     pipeline_exists = PIPELINE_SCRIPT.exists()
     config_exists = OVERALL_CONFIG.exists()
     trials_exist = len(list(TRIAL_FILES_DIR.glob("*.json"))) > 0 if TRIAL_FILES_DIR.exists() else False
@@ -670,22 +842,20 @@ def page_setup_paths():
     st.divider()
     
     if st.button("🔄 Refresh Status"):
+        log_activity("REFRESH", "Status check refreshed")
         st.rerun()
 
 
 def page_configure():
     """Configure Pipeline page - Main configuration interface."""
-    st.markdown('<p class="main-header">Configure Pipeline</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">⚙️ Configure Pipeline</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Set up your clinical trial matching parameters</p>', unsafe_allow_html=True)
     
-    # Load current config
     config = st.session_state.config
     trials = get_trials()
     cohorts = get_cohorts()
     
-    # =========================================================================
-    # ASSEMBLE COHORT SECTION (Full Width)
-    # =========================================================================
+    # ASSEMBLE COHORT SECTION
     st.markdown("### 👥 Assemble Cohort")
     st.markdown("Define criteria to identify matching patients from a cohort source")
     
@@ -694,7 +864,6 @@ def page_configure():
     with col1:
         st.markdown("**Patient Criteria**")
         
-        # Dynamic criteria inputs
         for i, criterion in enumerate(st.session_state.criteria_list):
             cols = st.columns([6, 1])
             with cols[0]:
@@ -709,15 +878,16 @@ def page_configure():
                 if len(st.session_state.criteria_list) > 1:
                     if st.button("✕", key=f"remove_{i}"):
                         st.session_state.criteria_list.pop(i)
+                        log_activity("CRITERION REMOVED", f"Removed criterion {i+1}")
                         st.rerun()
         
         if st.button("➕ Add Criterion"):
             st.session_state.criteria_list.append('')
+            log_activity("CRITERION ADDED", f"Total: {len(st.session_state.criteria_list)}")
             st.rerun()
         
         st.markdown("---")
         
-        # Cohort source and max patients
         subcol1, subcol2 = st.columns(2)
         with subcol1:
             cohort_options = [c['filename'] for c in cohorts]
@@ -755,7 +925,6 @@ def page_configure():
                 if results['matched_count'] > 0:
                     st.success(f"Found **{results['matched_count']}** patients:")
                     
-                    # Display patient IDs as badges
                     badges_html = ""
                     for pid in results['patient_ids_list']:
                         badges_html += f'<span class="patient-badge">{pid}</span>'
@@ -771,9 +940,7 @@ def page_configure():
     
     st.divider()
     
-    # =========================================================================
-    # TRIAL AND COHORT SELECTION (2 columns)
-    # =========================================================================
+    # TRIAL AND COHORT SELECTION
     col1, col2 = st.columns(2)
     
     with col1:
@@ -784,7 +951,6 @@ def page_configure():
             st.warning("No trial files found. Add trial JSON files to config_files/trial_files/")
             selected_trial = None
         else:
-            # Trial dropdown
             trial_options = {t['filename']: t['title'] for t in trials}
             current_trial = config.get('trial_file_config_path', '').split('/')[-1] if config.get('trial_file_config_path') else None
             
@@ -796,19 +962,16 @@ def page_configure():
                 key="selected_trial"
             )
         
-        # File upload
         uploaded_file = st.file_uploader("Upload Trial JSON", type=['json'], key="trial_upload")
         if uploaded_file:
             try:
                 trial_data = json.load(uploaded_file)
                 filename = uploaded_file.name
                 save_json(f"config_files/trial_files/{filename}", trial_data)
-                st.success(f"Trial '{filename}' uploaded successfully!")
                 st.rerun()
             except Exception as e:
                 st.error(f"Error uploading file: {e}")
         
-        # Create from free text
         with st.expander("📝 Create from free text"):
             new_trial_title = st.text_input("Trial Title", key="new_trial_title")
             new_trial_description = st.text_area("Trial Description (Full Text)", 
@@ -824,7 +987,6 @@ def page_configure():
                         "full_text": new_trial_description
                     }
                     if save_json(f"config_files/trial_files/{filename}", trial_data):
-                        st.success("Trial created successfully!")
                         st.rerun()
                 else:
                     st.warning("Please fill in both title and description.")
@@ -833,14 +995,12 @@ def page_configure():
         st.markdown("### 📊 Cohort Selection")
         st.markdown("Select patient cohort for matching")
         
-        # Get cohort names from directory
         cohort_names = [c['name'] for c in cohorts]
         
         if not cohort_names:
             st.warning("No cohort files found. Add cohort JSON files to config_files/pipeline_json_files/")
             cohort_type = 'custom'
         else:
-            # Radio selection for cohorts
             cohort_type = st.radio(
                 "Choose cohort",
                 options=cohort_names + ['custom'],
@@ -855,7 +1015,6 @@ def page_configure():
                 key="custom_cohort_path"
             )
         
-        # Cohort name input
         cohort_name = st.text_input(
             "Cohort Name",
             value=config.get('cohortName', ''),
@@ -864,9 +1023,7 @@ def page_configure():
     
     st.divider()
     
-    # =========================================================================
-    # PIPELINE STEPS AND ACTIONS (2 columns)
-    # =========================================================================
+    # PIPELINE STEPS AND ACTIONS
     col1, col2 = st.columns(2)
     
     with col1:
@@ -882,11 +1039,9 @@ def page_configure():
         st.markdown("### 🚀 Actions")
         st.markdown("Run pipeline or save configuration")
         
-        # Run Pipeline Section
         run_pipeline_btn = st.button("🚀 Run Pipeline", type="primary", use_container_width=True)
         
         if run_pipeline_btn:
-            # First save the current config
             updated_config = {
                 **config,
                 "cohortName": cohort_name,
@@ -897,7 +1052,15 @@ def page_configure():
             save_active_config(updated_config)
             st.session_state.config = updated_config
             
-            # Show progress
+            # Show modal for pipeline execution
+            st.info("🔄 **Pipeline Starting...**")
+            st.markdown(f"""
+            **Configuration:**
+            - Trial: `{selected_trial}`
+            - Cohort: `{cohort_name}`
+            - Steps: OCR={run_ocr}, LLM={do_llm_summarization}, Match={do_patient_matching}, Eval={do_evaluation}
+            """)
+            
             with st.spinner("🔄 Running pipeline... This may take several minutes."):
                 result = run_pipeline(
                     run_ocr=run_ocr,
@@ -907,7 +1070,6 @@ def page_configure():
                 )
                 st.session_state.pipeline_result = result
             
-            # Display results
             if result.get("error"):
                 st.error(f"❌ Pipeline failed: {result['error']}")
                 if result.get("hint"):
@@ -919,7 +1081,6 @@ def page_configure():
             else:
                 st.error("❌ Pipeline failed. Check the output below for details.")
         
-        # Show pipeline results if available
         if st.session_state.pipeline_result:
             result = st.session_state.pipeline_result
             
@@ -933,7 +1094,6 @@ def page_configure():
         
         st.markdown("---")
         
-        # Secondary actions
         col_a, col_b = st.columns(2)
         
         with col_a:
@@ -946,7 +1106,6 @@ def page_configure():
         
         with col_b:
             if st.button("💾 Save Config", use_container_width=True):
-                # Update config with current selections
                 updated_config = {
                     **config,
                     "cohortName": cohort_name,
@@ -958,7 +1117,6 @@ def page_configure():
                     st.session_state.config = updated_config
                     st.success("Configuration saved!")
         
-        # Debug command expander
         with st.expander("🔧 View Pipeline Command (for debugging)"):
             cmd_str = generate_pipeline_command(
                 run_ocr, do_llm_summarization, do_patient_matching, do_evaluation
@@ -969,17 +1127,15 @@ def page_configure():
 
 def page_adjust_prompts():
     """Adjust Prompts page - Configure AI agent prompts."""
-    st.markdown('<p class="main-header">Adjust Prompts</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">🤖 Adjust Prompts</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Configure AI agent system and main prompts</p>', unsafe_allow_html=True)
     
-    # Save All button at top
     col1, col2 = st.columns([4, 1])
     with col2:
         if st.button("💾 Save All Prompts", type="primary"):
             if save_prompts(st.session_state.prompts):
                 st.success("All prompts saved successfully!")
     
-    # Agent labels
     agent_labels = {
         "final_decision_agent": "Final Decision Agent",
         "eligibility_checker_agent": "Eligibility Checker Agent",
@@ -994,13 +1150,11 @@ def page_adjust_prompts():
     st.markdown("### 🤖 Agent Prompts")
     st.markdown("Edit system and main prompts for each AI agent")
     
-    # Create tabs for each agent
     if prompts:
         tabs = st.tabs([agent_labels.get(name, name) for name in prompts.keys()])
         
         for i, (agent_name, prompt_data) in enumerate(prompts.items()):
             with tabs[i]:
-                # Skip toggle
                 skip_val = prompt_data.get('skip', False)
                 col1, col2 = st.columns([4, 1])
                 with col1:
@@ -1009,11 +1163,11 @@ def page_adjust_prompts():
                     new_skip = st.checkbox("Skip", value=skip_val, key=f"skip_{agent_name}")
                     if new_skip != skip_val:
                         st.session_state.prompts[agent_name]['skip'] = new_skip
+                        log_activity("AGENT TOGGLED", f"{agent_name}: skip={new_skip}")
                 
                 if skip_val:
                     st.info("This agent is currently skipped in the pipeline.")
                 
-                # System prompt
                 st.markdown("**System Prompt**")
                 system_prompt = st.text_area(
                     "System Prompt",
@@ -1023,7 +1177,6 @@ def page_adjust_prompts():
                     label_visibility="collapsed"
                 )
                 
-                # Main prompt
                 st.markdown("**Main Prompt**")
                 main_prompt = st.text_area(
                     "Main Prompt",
@@ -1033,7 +1186,6 @@ def page_adjust_prompts():
                     label_visibility="collapsed"
                 )
                 
-                # Save individual agent
                 if st.button(f"💾 Save {agent_labels.get(agent_name, agent_name)}", key=f"save_{agent_name}"):
                     st.session_state.prompts[agent_name]['system_prompt'] = system_prompt
                     st.session_state.prompts[agent_name]['main_prompt'] = main_prompt
@@ -1045,7 +1197,7 @@ def page_adjust_prompts():
 
 def page_evaluation_criteria():
     """Evaluation Criteria page - Chat interface for criteria configuration."""
-    st.markdown('<p class="main-header">Evaluation Criteria</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">📋 Evaluation Criteria</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Configure criteria through conversation</p>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
@@ -1054,7 +1206,6 @@ def page_evaluation_criteria():
         st.markdown("### 💬 Chat")
         st.markdown("Discuss and refine evaluation criteria")
         
-        # Chat container
         chat_container = st.container(height=400)
         
         with chat_container:
@@ -1080,7 +1231,6 @@ def page_evaluation_criteria():
                         </div>
                         """, unsafe_allow_html=True)
         
-        # Input area
         col_input, col_btn = st.columns([5, 1])
         with col_input:
             user_input = st.text_input("Type your message...", key="chat_input", 
@@ -1090,18 +1240,18 @@ def page_evaluation_criteria():
             send_clicked = st.button("➤", key="send_btn")
         
         if send_clicked and user_input:
-            # Add user message
             st.session_state.chat_messages.append({
                 'role': 'user',
                 'content': user_input
             })
             
-            # Generate response (simple echo for now)
             response = f'I received your message: "{user_input}". How can I help you refine the evaluation criteria?'
             st.session_state.chat_messages.append({
                 'role': 'assistant',
                 'content': response
             })
+            
+            log_activity("CHAT MESSAGE", f"User: {user_input[:30]}...")
             
             st.rerun()
     
@@ -1119,7 +1269,6 @@ def page_evaluation_criteria():
         
         if st.button("💾 Save Criteria", type="primary", use_container_width=True):
             if criteria_text:
-                # Save to a criteria file
                 criteria_data = {
                     "criteria": criteria_text,
                     "updated_at": datetime.now().isoformat(),
@@ -1133,16 +1282,15 @@ def page_evaluation_criteria():
 
 def page_review_results():
     """Review Results page - Manual review placeholder."""
-    st.markdown('<p class="main-header">Manual Review Results</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">✓ Manual Review Results</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Review and approve/reject patient matches</p>', unsafe_allow_html=True)
     
     st.markdown("### 📋 Patient Matches")
     
-    # Info box
-    st.markdown("""
-    <div style="border: 2px dashed #e2e8f0; border-radius: 0.5rem; padding: 2rem; text-align: center; margin: 1rem 0;">
+    st.markdown(f"""
+    <div style="border: 2px dashed {NATERA_BLUE}66; border-radius: 0.5rem; padding: 2rem; text-align: center; margin: 1rem 0; background: linear-gradient(135deg, {NATERA_LIGHT_BLUE}30 0%, {NATERA_LIGHT_GREEN}30 100%);">
         <p style="font-size: 3rem; margin-bottom: 0.5rem;">🕐</p>
-        <h3 style="margin-bottom: 0.5rem;">Feature In Development</h3>
+        <h3 style="margin-bottom: 0.5rem; color: {NATERA_DARK_BLUE};">Feature In Development</h3>
         <p style="color: #64748b;">
             The manual review functionality is currently being developed. 
             Below is a preview of how it will look.
@@ -1150,7 +1298,6 @@ def page_review_results():
     </div>
     """, unsafe_allow_html=True)
     
-    # Dummy data for preview
     dummy_patients = [
         {"id": "PT-001", "decision": "Matched", "score": 4.2, "status": "pending"},
         {"id": "PT-002", "decision": "Not Matched", "score": 2.1, "status": "pending"},
@@ -1158,10 +1305,8 @@ def page_review_results():
         {"id": "PT-004", "decision": "Matched", "score": 3.5, "status": "rejected"},
     ]
     
-    # Display table with custom formatting
     st.markdown("---")
     
-    # Header row
     cols = st.columns([1, 1.5, 1, 1, 2])
     cols[0].markdown("**Patient ID**")
     cols[1].markdown("**Decision**")
@@ -1171,29 +1316,25 @@ def page_review_results():
     
     st.markdown("---")
     
-    # Data rows
     for patient in dummy_patients:
         cols = st.columns([1, 1.5, 1, 1, 2])
         
         cols[0].write(patient['id'])
         
-        # Decision badge
         if patient['decision'] == 'Matched':
-            cols[1].markdown(f'<span style="background-color: #22c55e; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;">{patient["decision"]}</span>', unsafe_allow_html=True)
+            cols[1].markdown(f'<span style="background-color: {NATERA_GREEN}; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;">{patient["decision"]}</span>', unsafe_allow_html=True)
         else:
             cols[1].markdown(f'<span style="background-color: #64748b; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;">{patient["decision"]}</span>', unsafe_allow_html=True)
         
         cols[2].write(f"{patient['score']:.1f}")
         
-        # Status badge
         status_colors = {
             'pending': '#f59e0b',
-            'approved': '#22c55e',
+            'approved': NATERA_GREEN,
             'rejected': '#ef4444'
         }
         cols[3].markdown(f'<span style="border: 1px solid {status_colors[patient["status"]]}; color: {status_colors[patient["status"]]}; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;">{patient["status"]}</span>', unsafe_allow_html=True)
         
-        # Action buttons (disabled)
         with cols[4]:
             btn_cols = st.columns(2)
             btn_cols[0].button("✓ Approve", key=f"approve_{patient['id']}", disabled=True)
@@ -1202,12 +1343,12 @@ def page_review_results():
 
 def page_results_summary():
     """Results Summary page - Display matching results and statistics."""
-    st.markdown('<p class="main-header">Results Summary</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">📊 Results Summary</p>', unsafe_allow_html=True)
     
-    # Refresh button at the top
     col_header1, col_header2 = st.columns([4, 1])
     with col_header2:
         if st.button("🔄 Refresh Results"):
+            log_activity("REFRESH", "Results refreshed")
             st.rerun()
     
     summary = get_results_summary()
@@ -1215,10 +1356,10 @@ def page_results_summary():
     if not summary.get('has_results'):
         st.markdown('<p class="sub-header">View matching results and statistics</p>', unsafe_allow_html=True)
         
-        st.markdown("""
-        <div style="text-align: center; padding: 4rem 2rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; margin: 2rem 0;">
+        st.markdown(f"""
+        <div style="text-align: center; padding: 4rem 2rem; border: 1px solid {NATERA_BLUE}33; border-radius: 0.75rem; margin: 2rem 0; background: linear-gradient(135deg, {NATERA_LIGHT_BLUE}30 0%, {NATERA_LIGHT_GREEN}30 100%);">
             <p style="font-size: 4rem; margin-bottom: 1rem;">⚠️</p>
-            <h3 style="margin-bottom: 0.5rem;">No Results Available</h3>
+            <h3 style="margin-bottom: 0.5rem; color: {NATERA_DARK_BLUE};">No Results Available</h3>
             <p style="color: #64748b; max-width: 400px; margin: 0 auto 1.5rem;">
                 Run the pipeline to generate matching results. Results will appear here once processing is complete.
             </p>
@@ -1235,26 +1376,25 @@ def page_results_summary():
     
     st.markdown(f'<p class="sub-header">Cohort: <strong>{summary["cohort_name"]}</strong></p>', unsafe_allow_html=True)
     
-    # Download button
     col1, col2 = st.columns([4, 1])
     with col2:
         csv_data = summary['dataframe'].to_csv(index=False)
-        st.download_button(
+        if st.download_button(
             label="📥 Download CSV",
             data=csv_data,
             file_name=f"matching_results_{summary['cohort_name']}.csv",
             mime="text/csv"
-        )
+        ):
+            log_activity("DOWNLOAD", f"Results CSV for {summary['cohort_name']}")
     
-    # Stats cards
     st.markdown("---")
     cols = st.columns(4)
     
     metrics = [
-        ("Total Patients", summary['total_patients'], "👥", "#3b82f6"),
-        ("Matched", summary['matched_count'], "✓", "#22c55e"),
+        ("Total Patients", summary['total_patients'], "👥", NATERA_BLUE),
+        ("Matched", summary['matched_count'], "✓", NATERA_GREEN),
         ("Not Matched", summary['not_matched_count'], "✕", "#ef4444"),
-        ("Match Rate", f"{summary['match_percentage']:.1f}%", "📊", "#3b82f6")
+        ("Match Rate", f"{summary['match_percentage']:.1f}%", "📊", NATERA_BLUE)
     ]
     
     for i, (label, value, icon, color) in enumerate(metrics):
@@ -1269,15 +1409,13 @@ def page_results_summary():
     
     st.markdown("---")
     
-    # Score distribution chart
     st.markdown("### 📊 Score Distribution")
     st.markdown("Distribution of matching scores across all patients")
     
     score_dist = summary['score_distribution']
     
-    # Prepare chart data
     chart_data = []
-    colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6']  # 1-5 scores
+    colors = ['#ef4444', '#f97316', '#eab308', NATERA_GREEN, NATERA_BLUE]
     
     for score in range(1, 6):
         count = score_dist.get(str(score), 0)
@@ -1302,35 +1440,25 @@ def page_results_summary():
         showlegend=False,
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(
-            showgrid=False,
-            title=None
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor='#e2e8f0',
-            title='Count'
-        ),
+        xaxis=dict(showgrid=False, title=None),
+        yaxis=dict(showgrid=True, gridcolor='#e2e8f0', title='Count'),
         height=400
     )
     
     st.plotly_chart(fig, use_container_width=True)
     
-    # Results table
     st.markdown("---")
     st.markdown("### 📋 Detailed Results")
     
     df = summary['dataframe']
     
-    # Check which columns exist
     display_cols = ['patient_id', 'final_decision', 'overall_score']
     if 'primary_reasons' in df.columns:
         display_cols.append('primary_reasons')
     
-    # Style the dataframe
     def color_decision(val):
         if val == 'MATCH':
-            return 'background-color: #dcfce7; color: #166534;'
+            return f'background-color: {NATERA_LIGHT_GREEN}; color: #166534;'
         else:
             return 'background-color: #fee2e2; color: #991b1b;'
     
@@ -1348,8 +1476,14 @@ def page_results_summary():
 def main():
     """Main application entry point."""
     
-    # Sidebar navigation
-    st.sidebar.title("🔬 Sigmatch")
+    # Natera Logo in sidebar
+    st.sidebar.markdown(f"""
+    <div class="natera-logo">
+        <img src="{NATERA_LOGO_URL}" alt="Natera" onerror="this.style.display='none'">
+        <h2 style="background: linear-gradient(90deg, {NATERA_GREEN} 0%, {NATERA_BLUE} 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0.5rem 0;">Sigmatch</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.sidebar.markdown("---")
     
     pages = {
@@ -1379,16 +1513,20 @@ def main():
     
     st.sidebar.markdown("---")
     
-    # Show current config info
+    # Current config info
     config = st.session_state.config
     if config:
-        st.sidebar.markdown("### Current Config")
+        st.sidebar.markdown("### 📌 Current Config")
         st.sidebar.markdown(f"**Cohort:** {config.get('cohortName', 'Not set')}")
         trial_path = config.get('trial_file_config_path', '')
         trial_name = trial_path.split('/')[-1].replace('.json', '') if trial_path else 'Not set'
         st.sidebar.markdown(f"**Trial:** {trial_name}")
     
-    # Show BASE_DIR in sidebar
+    st.sidebar.markdown("---")
+    
+    # Activity Log
+    render_activity_log()
+    
     st.sidebar.markdown("---")
     st.sidebar.caption(f"📂 Base: {BASE_DIR}")
     
