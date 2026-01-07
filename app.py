@@ -324,17 +324,56 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# ACTIVITY LOG FUNCTIONS
+# ACTIVITY LOG & ACTION TRACKING FUNCTIONS
 # =============================================================================
 
-def init_activity_log():
-    """Initialize activity log in session state."""
+def init_session_state():
+    """Initialize all session state variables."""
     if 'activity_log' not in st.session_state:
         st.session_state.activity_log = []
+    if 'operations_log' not in st.session_state:
+        st.session_state.operations_log = []
+    if 'last_action' not in st.session_state:
+        st.session_state.last_action = None
+    if 'show_action_modal' not in st.session_state:
+        st.session_state.show_action_modal = False
+
+def log_operation(operation_type: str, description: str, file_path: str = "", 
+                  code_executed: str = "", result: str = "success"):
+    """Log a detailed operation for the Operations Console."""
+    init_session_state()
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    
+    entry = {
+        "time": timestamp,
+        "type": operation_type,  # READ, WRITE, DELETE, EXECUTE, LOAD, SAVE
+        "description": description,
+        "file_path": file_path,
+        "code_executed": code_executed,
+        "result": result,
+        "full_timestamp": datetime.now().isoformat()
+    }
+    
+    st.session_state.operations_log.insert(0, entry)
+    # Keep last 100 operations
+    st.session_state.operations_log = st.session_state.operations_log[:100]
+    
+    return entry
+
+def set_last_action(action_name: str, description: str, details: Dict[str, Any]):
+    """Set the last action for modal display."""
+    init_session_state()
+    st.session_state.last_action = {
+        "name": action_name,
+        "description": description,
+        "details": details,
+        "timestamp": datetime.now().strftime("%H:%M:%S")
+    }
+    st.session_state.show_action_modal = True
 
 def log_activity(action: str, details: str = "", path: str = ""):
-    """Add an entry to the activity log."""
-    init_activity_log()
+    """Add an entry to the activity log (legacy support)."""
+    init_session_state()
     timestamp = datetime.now().strftime("%H:%M:%S")
     entry = {
         "time": timestamp,
@@ -342,52 +381,134 @@ def log_activity(action: str, details: str = "", path: str = ""):
         "details": details,
         "path": path
     }
-    st.session_state.activity_log.insert(0, entry)  # Most recent first
-    # Keep only last 50 entries
+    st.session_state.activity_log.insert(0, entry)
     st.session_state.activity_log = st.session_state.activity_log[:50]
 
 def show_toast(message: str, icon: str = "✓"):
     """Show a toast notification."""
     st.toast(f"{icon} {message}")
 
-def show_action_dialog(title: str, message: str, details: str = ""):
-    """Show a dialog for important actions."""
-    with st.expander(f"📋 {title}", expanded=True):
-        st.info(message)
-        if details:
-            st.code(details, language="text")
+def render_action_modal():
+    """Render a modal showing the last action's details."""
+    init_session_state()
+    
+    if st.session_state.show_action_modal and st.session_state.last_action:
+        action = st.session_state.last_action
+        
+        # Create a prominent action feedback box using native components
+        col1, col2, col3 = st.columns([1, 10, 1])
+        with col2:
+            st.info(f"🔔 **{action['name']}** [{action['timestamp']}]\n\n{action['description']}")
+            
+            # Show details in an expander
+            with st.expander("📋 View Backend Details (What happened?)", expanded=True):
+                details = action['details']
+                
+                if details.get('files_affected'):
+                    st.markdown("**📁 Files Affected:**")
+                    for f in details['files_affected']:
+                        # Show short path
+                        short_f = "/".join(f.split("/")[-3:]) if "/" in f else f
+                        st.code(short_f, language="text")
+                
+                if details.get('code_executed'):
+                    st.markdown("**💻 Code/Command Executed:**")
+                    st.code(details['code_executed'], language="python")
+                
+                if details.get('data_loaded'):
+                    st.markdown("**📥 Data Loaded:**")
+                    st.json(details['data_loaded'])
+                
+                if details.get('data_saved'):
+                    st.markdown("**💾 Data Saved:**")
+                    st.json(details['data_saved'])
+                
+                if details.get('result'):
+                    st.success(f"**Result:** {details['result']}")
+            
+            # Button to dismiss
+            if st.button("✕ Dismiss Notification", key="dismiss_modal", use_container_width=True):
+                st.session_state.show_action_modal = False
+                st.rerun()
+        
+        st.markdown("---")
+
+def render_operations_console():
+    """Render the scrollable Operations Console in the sidebar."""
+    init_session_state()
+    
+    st.sidebar.markdown("### 🖥️ Operations Console")
+    st.sidebar.caption("Real-time file operations log")
+    
+    type_icons = {
+        "READ": "📖",
+        "WRITE": "✍️",
+        "SAVE": "💾",
+        "LOAD": "📥",
+        "DELETE": "🗑️",
+        "EXECUTE": "▶️",
+        "CREATE": "📁",
+        "ERROR": "❌",
+        "SELECT": "👆",
+    }
+    
+    # Create scrollable container using expander with text
+    if not st.session_state.operations_log:
+        st.sidebar.text("$ Waiting for operations...")
+        st.sidebar.text("$ Actions will appear here")
+    else:
+        # Show operations in a scrollable text area style
+        with st.sidebar.container(height=200):
+            for entry in st.session_state.operations_log[:20]:
+                icon = type_icons.get(entry['type'], "📝")
+                time_str = entry['time']
+                op_type = entry['type']
+                desc = entry['description'][:35] + "..." if len(entry['description']) > 35 else entry['description']
+                file_path = entry.get('file_path', '')
+                
+                # Format the entry
+                st.text(f"[{time_str}] {icon} {op_type}")
+                st.caption(f"   {desc}")
+                if file_path:
+                    short_path = file_path.split('/')[-1] if '/' in file_path else file_path
+                    st.caption(f"   → {short_path}")
+                st.markdown("---")
+    
+    # Clear console button
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("🗑️ Clear", key="clear_console", use_container_width=True):
+            st.session_state.operations_log = []
+            st.rerun()
+    with col2:
+        if st.button("📋 Export", key="copy_console", use_container_width=True):
+            # Show copyable text version in expander
+            with st.sidebar.expander("📋 Copy Log", expanded=True):
+                log_text = "\n".join([
+                    f"[{e['time']}] {e['type']}: {e['description']} → {e.get('file_path', '').split('/')[-1] if e.get('file_path') else ''}"
+                    for e in st.session_state.operations_log[:30]
+                ])
+                st.code(log_text, language="text")
 
 def render_activity_log():
-    """Render the activity log in the sidebar."""
-    init_activity_log()
+    """Render the activity summary in the sidebar."""
+    init_session_state()
     
-    st.sidebar.markdown("### 📋 Activity Log")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📊 Session Summary")
     
-    if not st.session_state.activity_log:
-        st.sidebar.markdown("""
-        <div class="activity-log">
-            <p style="color: #666; text-align: center; padding: 1rem;">
-                No activity yet.<br>Actions will appear here.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # Count operations by type
+    if st.session_state.operations_log:
+        reads = sum(1 for e in st.session_state.operations_log if e['type'] in ['READ', 'LOAD'])
+        writes = sum(1 for e in st.session_state.operations_log if e['type'] in ['WRITE', 'SAVE', 'CREATE'])
+        executes = sum(1 for e in st.session_state.operations_log if e['type'] == 'EXECUTE')
+        
+        col1, col2, col3 = st.sidebar.columns(3)
+        col1.metric("📥 Loads", reads)
+        col2.metric("💾 Saves", writes)
+        col3.metric("▶️ Runs", executes)
     else:
-        log_html = '<div class="activity-log">'
-        for entry in st.session_state.activity_log[:15]:  # Show last 15
-            log_html += f'''
-            <div class="log-entry">
-                <span class="log-time">[{entry["time"]}]</span> 
-                <span class="log-action">{entry["action"]}</span>
-                {f'<br><span class="log-path">→ {entry["path"]}</span>' if entry.get("path") else ""}
-            </div>
-            '''
-        log_html += '</div>'
-        st.sidebar.markdown(log_html, unsafe_allow_html=True)
-    
-    # Clear log button
-    if st.sidebar.button("🗑️ Clear Log", use_container_width=True):
-        st.session_state.activity_log = []
-        st.rerun()
+        st.sidebar.caption("No operations recorded yet.")
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -405,16 +526,21 @@ def get_paths_info() -> Dict[str, str]:
         "active_config": str(OVERALL_CONFIG.resolve()),
     }
 
-def load_json(relative_path: str) -> Optional[Dict[str, Any]]:
+def load_json(relative_path: str, log_op: bool = False) -> Optional[Dict[str, Any]]:
     """Load JSON file from path relative to BASE_DIR."""
     try:
         full_path = BASE_DIR / relative_path
         if not full_path.exists():
             return None
         with open(full_path, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+        
+        if log_op:
+            log_operation("READ", f"Loaded JSON: {relative_path.split('/')[-1]}", str(full_path),
+                         code_executed=f"json.load('{relative_path}')")
+        return data
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error loading {relative_path}: {e}")
+        log_operation("ERROR", f"Failed to load: {e}", relative_path, result="error")
         return None
 
 def save_json(relative_path: str, data: Dict[str, Any], log_action: bool = True) -> bool:
@@ -426,16 +552,19 @@ def save_json(relative_path: str, data: Dict[str, Any], log_action: bool = True)
             json.dump(data, f, indent=2)
         
         if log_action:
+            log_operation("SAVE", f"Saved JSON: {relative_path.split('/')[-1]}", str(full_path),
+                         code_executed=f"json.dump(data, '{relative_path}')")
             log_activity("FILE SAVED", f"Saved JSON data", relative_path)
             show_toast(f"Saved: {relative_path.split('/')[-1]}")
         
         return True
     except Exception as e:
         st.error(f"Error saving file: {e}")
+        log_operation("ERROR", f"Failed to save: {e}", relative_path, result="error")
         log_activity("ERROR", f"Failed to save: {e}", relative_path)
         return False
 
-def get_trials() -> List[Dict[str, str]]:
+def get_trials(log_op: bool = False) -> List[Dict[str, str]]:
     """Get all trial files from trial_files directory."""
     if not TRIAL_FILES_DIR.exists():
         return []
@@ -457,9 +586,10 @@ def get_trials() -> List[Dict[str, str]]:
                 "title": f.stem,
                 "_id": f.stem
             })
+    
     return trials
 
-def get_cohorts() -> List[Dict[str, Any]]:
+def get_cohorts(log_op: bool = False) -> List[Dict[str, Any]]:
     """Get all cohort files from pipeline_json_files directory."""
     if not COHORT_FILES_DIR.exists():
         return []
@@ -481,6 +611,7 @@ def get_cohorts() -> List[Dict[str, Any]]:
                 "name": f.stem,
                 "patient_count": 0
             })
+    
     return cohorts
 
 def get_active_config() -> Dict[str, Any]:
@@ -506,27 +637,79 @@ def save_active_config(config: Dict[str, Any]) -> bool:
     config["evaluation_results_path"] = f"results_dir/evaluation/matching_results_summary_{cohort_name}.xlsx"
     
     # Create directories if needed
-    (BASE_DIR / config["matching_result_dir"]).mkdir(parents=True, exist_ok=True)
-    (BASE_DIR / config["llm_summarization_result_dir"]).mkdir(parents=True, exist_ok=True)
+    matching_dir = BASE_DIR / config["matching_result_dir"]
+    llm_dir = BASE_DIR / config["llm_summarization_result_dir"]
+    matching_dir.mkdir(parents=True, exist_ok=True)
+    llm_dir.mkdir(parents=True, exist_ok=True)
+    
+    log_operation("CREATE", f"Created directory: {config['matching_result_dir']}", str(matching_dir))
+    log_operation("CREATE", f"Created directory: {config['llm_summarization_result_dir']}", str(llm_dir))
     
     # Create timestamped backup
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_filename = f"data_config_{cohort_name}__{timestamp}.json"
     backup_path = f"config_files/overall_config_settings/{backup_filename}"
+    
+    log_operation("SAVE", f"Saving config backup: {backup_filename}", str(BASE_DIR / backup_path),
+                 code_executed=f"json.dump(config, '{backup_path}')")
     save_json(backup_path, config, log_action=False)
+    
+    # Save as active config
+    active_path = "config_files/overall_config_settings/active_data_config.json"
+    log_operation("SAVE", f"Saving active config", str(BASE_DIR / active_path),
+                 code_executed=f"json.dump(config, '{active_path}')")
     
     # Log the activity
     log_activity("CONFIG SAVED", f"Cohort: {cohort_name}", backup_path)
     show_toast(f"Config saved for cohort: {cohort_name}", "💾")
     
-    # Save as active config
-    return save_json("config_files/overall_config_settings/active_data_config.json", config, log_action=False)
+    # Set action modal
+    set_last_action(
+        "💾 Configuration Saved",
+        f"Saved configuration for cohort: {cohort_name}",
+        {
+            "files_affected": [
+                str(BASE_DIR / backup_path),
+                str(BASE_DIR / active_path),
+                str(matching_dir),
+                str(llm_dir)
+            ],
+            "code_executed": f"""
+# Auto-generated paths for cohort: {cohort_name}
+config["pdf_data_dir"] = "{config['pdf_data_dir']}"
+config["ocr_data_dir"] = "{config['ocr_data_dir']}"
+config["matching_result_dir"] = "{config['matching_result_dir']}"
+config["llm_summarization_result_dir"] = "{config['llm_summarization_result_dir']}"
+
+# Created directories
+os.makedirs("{matching_dir}", exist_ok=True)
+os.makedirs("{llm_dir}", exist_ok=True)
+
+# Saved files
+json.dump(config, "{backup_path}")
+json.dump(config, "{active_path}")
+""",
+            "data_saved": {
+                "cohortName": cohort_name,
+                "trial_file_config_path": config.get("trial_file_config_path"),
+                "patients_file_path": config.get("patients_file_path")
+            },
+            "result": f"Backup: {backup_filename}"
+        }
+    )
+    
+    return save_json(active_path, config, log_action=False)
 
 def assemble_cohort(criteria_list: List[str], cohort_source: str, max_patients: int) -> Dict[str, Any]:
     """Assemble a cohort based on search criteria."""
     try:
         cohort_path = COHORT_FILES_DIR / cohort_source
+        
+        log_operation("READ", f"Loading cohort: {cohort_source}", str(cohort_path),
+                     code_executed=f"open('{cohort_path}', 'r')")
+        
         if not cohort_path.exists():
+            log_operation("ERROR", f"Cohort file not found", str(cohort_path), result="not_found")
             return {"matched_count": 0, "patient_ids_list": []}
         
         with open(cohort_path, 'r') as f:
@@ -555,8 +738,32 @@ def assemble_cohort(criteria_list: List[str], cohort_source: str, max_patients: 
             if all_match:
                 matched.append(patient.get('patient_id', 'Unknown'))
         
+        log_operation("EXECUTE", f"Keyword search: {len(matched)} matches", str(cohort_path),
+                     code_executed=f"search_criteria={criteria_list}, max={max_patients}")
+        
         log_activity("COHORT ASSEMBLED", f"Found {len(matched)} patients from {cohort_source}")
         show_toast(f"Found {len(matched)} matching patients", "🔍")
+        
+        # Set action modal
+        set_last_action(
+            "🔍 Patient Search",
+            f"Searched {len(cohort)} patients, found {len(matched)} matches",
+            {
+                "files_affected": [str(cohort_path)],
+                "code_executed": f"""
+# Load cohort data
+with open('{cohort_path}', 'r') as f:
+    cohort = json.load(f)
+
+# Search criteria: {criteria_list}
+# Max patients: {max_patients}
+# Total in cohort: {len(cohort)}
+# Matched: {len(matched)}
+""",
+                "data_loaded": {"patient_count": len(cohort), "criteria": criteria_list},
+                "result": f"Found {len(matched)} patients: {matched}"
+            }
+        )
         
         return {
             "matched_count": len(matched),
@@ -564,6 +771,7 @@ def assemble_cohort(criteria_list: List[str], cohort_source: str, max_patients: 
         }
     except Exception as e:
         st.error(f"Error assembling cohort: {e}")
+        log_operation("ERROR", f"Cohort assembly failed: {e}", result="error")
         log_activity("ERROR", f"Cohort assembly failed: {e}")
         return {"matched_count": 0, "patient_ids_list": []}
 
@@ -582,19 +790,33 @@ def run_pipeline(run_ocr: bool, do_llm_summarization: bool,
                  do_patient_matching: bool, do_evaluation: bool) -> Dict[str, Any]:
     """Run Noah's pipeline directly and return results."""
     
+    config_path = "config_files/overall_config_settings/active_data_config.json"
+    
+    log_operation("EXECUTE", "Starting pipeline execution", str(PIPELINE_SCRIPT),
+                 code_executed=f"OCR={run_ocr}, LLM={do_llm_summarization}, Match={do_patient_matching}, Eval={do_evaluation}")
     log_activity("PIPELINE STARTED", f"OCR={run_ocr}, LLM={do_llm_summarization}, Match={do_patient_matching}, Eval={do_evaluation}")
     
     # Check if pipeline script exists
     if not PIPELINE_SCRIPT.exists():
+        log_operation("ERROR", "Pipeline script not found", str(PIPELINE_SCRIPT), result="not_found")
         log_activity("ERROR", "Pipeline script not found", str(PIPELINE_SCRIPT))
+        
+        set_last_action(
+            "❌ Pipeline Error",
+            f"Pipeline script not found",
+            {
+                "files_affected": [str(PIPELINE_SCRIPT)],
+                "code_executed": f"os.path.exists('{PIPELINE_SCRIPT}')  # Returns False",
+                "result": f"Script should be at: {PIPELINE_SCRIPT}"
+            }
+        )
+        
         return {
             "error": f"Pipeline script not found at:\n{PIPELINE_SCRIPT}\n\n"
                      f"orchestrate_pipeline.py should be in the sigmatch root folder:\n{BASE_DIR}",
             "hint": "Make sure orchestrate_pipeline.py is in the correct location",
             "success": False
         }
-    
-    config_path = "config_files/overall_config_settings/active_data_config.json"
     
     # Build command
     cmd = [
@@ -606,6 +828,9 @@ def run_pipeline(run_ocr: bool, do_llm_summarization: bool,
         "--do_patient_matching", str(do_patient_matching),
         "--do_evaluation", str(do_evaluation)
     ]
+    
+    cmd_str = " ".join(cmd)
+    log_operation("EXECUTE", "Running pipeline command", str(BASE_DIR), code_executed=cmd_str)
     
     try:
         env = os.environ.copy()
@@ -620,25 +845,52 @@ def run_pipeline(run_ocr: bool, do_llm_summarization: bool,
         )
         
         if result.returncode == 0:
+            log_operation("EXECUTE", "Pipeline completed successfully", "results_dir/matching/", result="success")
             log_activity("PIPELINE COMPLETED", "Success!", "results_dir/matching/")
+            
+            set_last_action(
+                "✅ Pipeline Completed",
+                "Pipeline executed successfully",
+                {
+                    "files_affected": [
+                        str(PIPELINE_SCRIPT),
+                        str(BASE_DIR / config_path),
+                        "results_dir/matching/*/matching_results.csv"
+                    ],
+                    "code_executed": cmd_str,
+                    "result": "Pipeline completed with exit code 0"
+                }
+            )
         else:
+            log_operation("ERROR", f"Pipeline failed: exit code {result.returncode}", result="error")
             log_activity("PIPELINE FAILED", f"Exit code: {result.returncode}")
+            
+            set_last_action(
+                "❌ Pipeline Failed",
+                f"Pipeline exited with code {result.returncode}",
+                {
+                    "code_executed": cmd_str,
+                    "result": f"Exit code: {result.returncode}\nStderr: {result.stderr[:500] if result.stderr else 'None'}"
+                }
+            )
         
         return {
             "success": result.returncode == 0,
             "stdout": result.stdout,
             "stderr": result.stderr,
             "returncode": result.returncode,
-            "command": " ".join(cmd)
+            "command": cmd_str
         }
         
     except subprocess.TimeoutExpired:
+        log_operation("ERROR", "Pipeline timed out after 1 hour", result="timeout")
         log_activity("ERROR", "Pipeline timed out after 1 hour")
         return {
             "error": "Pipeline timed out after 1 hour. The process may still be running.",
             "success": False
         }
     except Exception as e:
+        log_operation("ERROR", f"Pipeline error: {str(e)}", result="error")
         log_activity("ERROR", f"Pipeline error: {str(e)}")
         return {
             "error": f"Unexpected error running pipeline: {str(e)}",
@@ -652,15 +904,39 @@ def save_snapshot() -> str:
     
     try:
         snapshot_dir.mkdir(parents=True, exist_ok=True)
+        log_operation("CREATE", f"Created snapshot directory", str(snapshot_dir))
         
         if CONFIG_DIR.exists():
             shutil.copytree(CONFIG_DIR, snapshot_dir / "config_files")
+            log_operation("SAVE", f"Copied config_files to snapshot", str(snapshot_dir / "config_files"),
+                         code_executed=f"shutil.copytree('{CONFIG_DIR}', '{snapshot_dir}/config_files')")
         
         log_activity("SNAPSHOT SAVED", f"snapshot_{timestamp}", str(snapshot_dir))
         show_toast(f"Snapshot saved: {timestamp}", "📸")
         
+        # Set action modal
+        set_last_action(
+            "📸 Snapshot Created",
+            f"Saved snapshot of all configuration files",
+            {
+                "files_affected": [
+                    str(snapshot_dir),
+                    str(snapshot_dir / "config_files")
+                ],
+                "code_executed": f"""
+# Create snapshot directory
+os.makedirs("{snapshot_dir}", exist_ok=True)
+
+# Copy all config files
+shutil.copytree("{CONFIG_DIR}", "{snapshot_dir}/config_files")
+""",
+                "result": f"Snapshot saved to: {snapshot_dir}"
+            }
+        )
+        
         return str(snapshot_dir)
     except Exception as e:
+        log_operation("ERROR", f"Snapshot failed: {e}", result="error")
         log_activity("ERROR", f"Snapshot failed: {e}")
         raise Exception(f"Failed to save snapshot: {e}")
 
@@ -680,14 +956,39 @@ def save_prompts(prompts: Dict[str, Any]) -> bool:
     
     # Backup current
     backup_path = f"config_files/prompt_settings/sigmatch_standard_prompt_content_{timestamp}.json"
+    active_path = "config_files/prompt_settings/sigmatch_standard_prompt_content.json"
+    
+    log_operation("SAVE", f"Saving prompts backup", str(BASE_DIR / backup_path))
     save_json(backup_path, prompts, log_action=False)
+    
+    log_operation("SAVE", f"Saving active prompts", str(BASE_DIR / active_path))
     
     # Log activity
     log_activity("PROMPTS SAVED", f"Backup: {timestamp}", backup_path)
     show_toast("Prompts saved successfully", "🤖")
     
+    # Set action modal
+    agent_names = list(prompts.keys())
+    set_last_action(
+        "🤖 Prompts Saved",
+        f"Saved prompts for {len(agent_names)} agents",
+        {
+            "files_affected": [
+                str(BASE_DIR / backup_path),
+                str(BASE_DIR / active_path)
+            ],
+            "code_executed": f"""
+# Agents updated: {agent_names}
+# Backup: {backup_path}
+json.dump(prompts, "{active_path}")
+""",
+            "data_saved": {"agents": agent_names},
+            "result": f"Saved {len(agent_names)} agent prompts"
+        }
+    )
+    
     # Save as current
-    return save_json("config_files/prompt_settings/sigmatch_standard_prompt_content.json", prompts, log_action=False)
+    return save_json(active_path, prompts, log_action=False)
 
 def get_results_summary() -> Dict[str, Any]:
     """Get summary of matching results."""
@@ -739,6 +1040,9 @@ def get_results_summary() -> Dict[str, Any]:
 # SESSION STATE INITIALIZATION
 # =============================================================================
 
+# Initialize all session state
+init_session_state()
+
 if 'criteria_list' not in st.session_state:
     st.session_state.criteria_list = ['']
 
@@ -757,7 +1061,8 @@ if 'prompts' not in st.session_state:
 if 'pipeline_result' not in st.session_state:
     st.session_state.pipeline_result = None
 
-init_activity_log()
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "Configure"
 
 # =============================================================================
 # PAGE FUNCTIONS
@@ -959,7 +1264,9 @@ def page_configure():
                 options=list(trial_options.keys()),
                 format_func=lambda x: trial_options.get(x, x),
                 index=list(trial_options.keys()).index(current_trial) if current_trial in trial_options else 0,
-                key="selected_trial"
+                key="selected_trial",
+                on_change=lambda: log_operation("SELECT", f"Selected trial: {st.session_state.selected_trial}", 
+                                                str(TRIAL_FILES_DIR / st.session_state.selected_trial))
             )
         
         uploaded_file = st.file_uploader("Upload Trial JSON", type=['json'], key="trial_upload")
@@ -1004,7 +1311,10 @@ def page_configure():
             cohort_type = st.radio(
                 "Choose cohort",
                 options=cohort_names + ['custom'],
-                key="cohort_type"
+                key="cohort_type",
+                on_change=lambda: log_operation("SELECT", f"Selected cohort: {st.session_state.cohort_type}",
+                                                str(COHORT_FILES_DIR / f"{st.session_state.cohort_type}.json") 
+                                                if st.session_state.cohort_type != 'custom' else "")
             )
         
         custom_path = ""
@@ -1098,14 +1408,21 @@ def page_configure():
         
         with col_a:
             if st.button("📸 Save Snapshot", use_container_width=True):
+                log_operation("SAVE", "Creating snapshot of config files", str(SNAPSHOTS_DIR))
                 try:
                     snapshot_path = save_snapshot()
                     st.success(f"Snapshot saved!")
+                    st.rerun()
                 except Exception as e:
+                    log_operation("ERROR", f"Snapshot failed: {e}", result="error")
                     st.error(str(e))
         
         with col_b:
             if st.button("💾 Save Config", use_container_width=True):
+                # Log the action first
+                log_operation("SAVE", f"Saving config for cohort: {cohort_name}", 
+                             str(OVERALL_CONFIG))
+                
                 updated_config = {
                     **config,
                     "cohortName": cohort_name,
@@ -1115,7 +1432,9 @@ def page_configure():
                 
                 if save_active_config(updated_config):
                     st.session_state.config = updated_config
+                    log_operation("SAVE", "Config saved successfully", str(OVERALL_CONFIG))
                     st.success("Configuration saved!")
+                    st.rerun()  # Force rerun to update console
         
         with st.expander("🔧 View Pipeline Command (for debugging)"):
             cmd_str = generate_pipeline_command(
@@ -1504,12 +1823,23 @@ def main():
         "Results Summary": "📊"
     }
     
+    # Get current page from session state or default
+    current_page = st.session_state.get('current_page', 'Configure')
+    
     selection = st.sidebar.radio(
         "Navigation",
         options=list(pages.keys()),
+        index=list(pages.keys()).index(current_page) if current_page in pages else 1,
         format_func=lambda x: f"{page_icons[x]} {x}",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key="page_selector"
     )
+    
+    # Log page navigation if changed
+    if selection != st.session_state.get('current_page'):
+        st.session_state.current_page = selection
+        log_operation("SELECT", f"Navigated to: {selection}", "", 
+                     code_executed=f"page = '{selection}'")
     
     st.sidebar.markdown("---")
     
@@ -1524,11 +1854,17 @@ def main():
     
     st.sidebar.markdown("---")
     
-    # Activity Log
+    # Operations Console (scrollable terminal)
+    render_operations_console()
+    
+    # Activity Summary
     render_activity_log()
     
     st.sidebar.markdown("---")
     st.sidebar.caption(f"📂 Base: {BASE_DIR}")
+    
+    # Render action modal in main area if there's a recent action
+    render_action_modal()
     
     # Render selected page
     pages[selection]()
