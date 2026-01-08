@@ -458,7 +458,7 @@ def render_operations_console():
         st.sidebar.text("$ Actions will appear here")
     else:
         # Show operations in a scrollable text area style
-        with st.sidebar.container(height=200):
+        with st.sidebar.container(height=250):
             for entry in st.session_state.operations_log[:20]:
                 icon = type_icons.get(entry['type'], "📝")
                 time_str = entry['time']
@@ -470,8 +470,17 @@ def render_operations_console():
                 st.text(f"[{time_str}] {icon} {op_type}")
                 st.caption(f"   {desc}")
                 if file_path:
-                    short_path = file_path.split('/')[-1] if '/' in file_path else file_path
-                    st.caption(f"   → {short_path}")
+                    # Show relative path from BASE_DIR for clarity
+                    base_str = str(BASE_DIR)
+                    if file_path.startswith(base_str):
+                        # Convert absolute path to relative
+                        rel_path = file_path[len(base_str):].lstrip('/')
+                    elif '/' in file_path and not file_path.startswith('/'):
+                        # Already a relative path
+                        rel_path = file_path
+                    else:
+                        rel_path = file_path
+                    st.caption(f"   📂 {rel_path}")
                 st.markdown("---")
     
     # Clear console button
@@ -484,8 +493,14 @@ def render_operations_console():
         if st.button("📋 Export", key="copy_console", use_container_width=True):
             # Show copyable text version in expander
             with st.sidebar.expander("📋 Copy Log", expanded=True):
+                base_str = str(BASE_DIR)
+                def get_rel_path(fp):
+                    if not fp: return ""
+                    if fp.startswith(base_str):
+                        return fp[len(base_str):].lstrip('/')
+                    return fp
                 log_text = "\n".join([
-                    f"[{e['time']}] {e['type']}: {e['description']} → {e.get('file_path', '').split('/')[-1] if e.get('file_path') else ''}"
+                    f"[{e['time']}] {e['type']}: {e['description']}\n    → {get_rel_path(e.get('file_path', ''))}"
                     for e in st.session_state.operations_log[:30]
                 ])
                 st.code(log_text, language="text")
